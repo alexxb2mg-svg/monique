@@ -53,8 +53,10 @@ FICHIERS_IGNORES = {
     "scripts/verifier_anonymat.py"
 }  # ce script parle DES motifs : il ne se dénonce pas
 
-# Identité attendue de TOUT commit du miroir public (configurable).
-EMAIL_PUBLIC = os.environ.get("MONIQUE_EMAIL_PUBLIC", "").strip()
+# Identités noreply acceptées pour un commit : celles de l'utilisateur ET celles générées
+# par GitHub (web-flow, Actions, Dependabot). Le but est de bloquer une identité RÉELLE
+# (nom + email perso), jamais les noreply GitHub qui ne révèlent rien.
+_NOREPLY_OK = ("users.noreply.github.com>", "noreply@github.com>")
 
 # Motifs STRUCTURELS — pas besoin du coffre : un chemin de poste ou un email personnel
 # est une fuite quelle que soit la liste. Le chemin tolère 1 à 2 antislashs (dans un JSON
@@ -155,11 +157,9 @@ def verifier_historique(motifs) -> int:
         text=True,
         check=True,
     ).stdout.splitlines()
-    for ident in sorted(set(i for i in identites if i.strip())):
-        if EMAIL_PUBLIC and EMAIL_PUBLIC not in ident:
-            problemes.append(f"identité non anonyme : {ident}")
-        elif not EMAIL_PUBLIC and not ident.endswith("users.noreply.github.com>"):
-            problemes.append(f"identité non-noreply : {ident}")
+    for ident in sorted({i for i in identites if i.strip()}):
+        if not ident.endswith(_NOREPLY_OK):
+            problemes.append(f"identité non-noreply (email réel ?) : {ident}")
     revs = subprocess.run(
         ["git", "rev-list", "--all"], capture_output=True, text=True, check=True
     ).stdout.split()
