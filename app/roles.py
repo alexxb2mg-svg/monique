@@ -53,6 +53,7 @@ def parse_role(agent: str) -> dict:
         "name": meta.get("name", agent),
         "triggers": meta.get("triggers_deterministes", []),
         "description": meta.get("description_routage", ""),
+        "departement": meta.get("departement", "Non affecté"),  # org vivante : Beecham fait grandir
         "corps": corps or DEFAUT,
     }
 
@@ -63,6 +64,15 @@ def carte_agents() -> dict:
         for d in RACINE_AGENTS.iterdir():
             if (d / "ROLE.md").exists():
                 out[d.name] = parse_role(d.name)
+    return out
+
+
+def carte_departements() -> dict:
+    """Agents groupés par département (nav vivante à 2 niveaux). L'ordre des départements
+    suit leur première apparition ; Beecham peut ajouter agents et départements."""
+    out = {}
+    for nom, fiche in carte_agents().items():
+        out.setdefault(fiche.get("departement") or "Non affecté", {})[nom] = fiche
     return out
 
 

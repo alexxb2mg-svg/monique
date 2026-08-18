@@ -1,5 +1,6 @@
 ---
 name: chercheur
+departement: Recherche
 triggers_deterministes: [tag=veille, tag=recherche]
 description_routage: mène des veilles et recherches documentaires sur un sujet donné
 ---

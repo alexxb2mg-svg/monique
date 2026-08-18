@@ -1,5 +1,6 @@
 ---
 name: secretaire
+departement: Direction
 triggers_deterministes: [canal=email, canal=whatsapp, canal=sms, tag=rdv, tag=relance]
 description_routage: gère les mails et messages entrants, RDV, classement, relances clients et devis
 ---
