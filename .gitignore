@@ -40,3 +40,6 @@ ty.toml
 # OS
 .DS_Store
 Thumbs.db
+
+# Worktrees jetables de Beecham (hors dépôt de toute façon)
+.beecham_worktrees/

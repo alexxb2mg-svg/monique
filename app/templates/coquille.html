@@ -4,26 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monique</title>
-<link rel="stylesheet" href="/static/ohmie.css">
+<link rel="stylesheet" href="/static/ohmie.css?v=2">
 <script src="/static/htmx.min.js"></script>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <div class="marque">Mon<span class="pt">ique</span><span class="date">{{ date }}</span></div>
-    <span class="enligne"><span class="dot"></span>En ligne</span>
+    <div class="moniquecard">
+      <img class="mavatar" src="/static/avatars/secretaire.png" alt="Monique">
+      <span class="enligne"><span class="dot"></span>En ligne</span>
+    </div>
   </header>
 
   <nav class="onglets" id="onglets">
-    <button class="onglet actif" hx-get="/vue/jour" hx-target="#vue">Aujourd'hui</button>
-    <button class="onglet" hx-get="/vue/boite" hx-target="#vue">La boîte</button>
-    <button class="onglet" hx-get="/vue/faire" hx-target="#vue">À faire</button>
-    <button class="onglet" hx-get="/vue/relances" hx-target="#vue">Relances</button>
-    <button class="onglet" hx-get="/vue/monitoring" hx-target="#vue">Monitoring</button>
-    <button class="onglet" hx-get="/vue/reglages" hx-target="#vue">Réglages</button>
-    <button class="onglet" hx-get="/vue/planif" hx-target="#vue">Planificateur</button>
-    <button class="onglet" hx-get="/vue/fournisseurs" hx-target="#vue">Fournisseurs</button>
-    <button class="onglet" hx-get="/vue/agents" hx-target="#vue">Agents</button>
+    <button class="onglet actif" hx-get="/vue/jour" hx-target="#vue"><img class="onglet-av" src="/static/avatars/secretaire.png" alt="">Aujourd'hui</button>
+    <button class="onglet" hx-get="/vue/boite" hx-target="#vue"><img class="onglet-av" src="/static/avatars/classement.jpg" alt="">La boîte</button>
+    <button class="onglet" hx-get="/vue/faire" hx-target="#vue"><img class="onglet-av" src="/static/avatars/maitre_oeuvre.jpg" alt="">À faire</button>
+    <button class="onglet" hx-get="/vue/relances" hx-target="#vue"><img class="onglet-av" src="/static/avatars/comptable.jpg" alt="">Relances</button>
+    <button class="onglet" hx-get="/vue/monitoring" hx-target="#vue"><img class="onglet-av" src="/static/avatars/veilleur.jpg" alt="">Monitoring</button>
+    <button class="onglet" hx-get="/vue/reglages" hx-target="#vue"><img class="onglet-av" src="/static/avatars/developpeur.jpg" alt="">Réglages</button>
+    <button class="onglet" hx-get="/vue/planif" hx-target="#vue"><img class="onglet-av" src="/static/avatars/technicien.jpg" alt="">Planificateur</button>
+    <button class="onglet" hx-get="/vue/fournisseurs" hx-target="#vue"><img class="onglet-av" src="/static/avatars/documentaliste.jpg" alt="">Fournisseurs</button>
+    <button class="onglet" hx-get="/vue/agents" hx-target="#vue"><img class="onglet-av" src="/static/avatars/orchestrateur.jpg" alt="">Agents</button>
+    <button class="onglet" hx-get="/vue/beecham" hx-target="#vue"><img class="onglet-av" src="/static/avatars/orchestrateur.jpg" alt="">Beecham</button>
   </nav>
 
   <section id="vue">{% include "vue_jour.html" %}</section>
@@ -31,9 +35,10 @@
 
 <script>
   document.getElementById('onglets').addEventListener('click', function (e) {
-    if (!e.target.classList.contains('onglet')) return;
+    var b = e.target.closest('.onglet');   // le clic peut atterrir sur l'avatar dans le bouton
+    if (!b) return;
     document.querySelectorAll('.onglet').forEach(function (o) { o.classList.remove('actif'); });
-    e.target.classList.add('actif');
+    b.classList.add('actif');
   });
 </script>
 </body>

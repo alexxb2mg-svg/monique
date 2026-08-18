@@ -1,0 +1,57 @@
+<div class="besoin-titre">Beecham — chef d'orchestre</div>
+
+<form hx-post="/beecham/mission" hx-target="#vue">
+  <div class="champ-bloc">
+    <label class="lab">Consigne</label>
+    <textarea class="champ" name="consigne" rows="3" placeholder="Décris la mission à confier à la brigade…" required></textarea>
+  </div>
+  <div class="champ-bloc">
+    <label class="lab">Rôle</label>
+    <select class="champ" name="role">
+      {% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="actions"><button class="btn primaire" type="submit">Lancer une mission</button></div>
+</form>
+
+<div class="rupture"></div>
+
+<div class="h3">Missions récentes</div>
+<div id="beecham-liste"{% if en_cours_actif %} hx-get="/vue/beecham" hx-trigger="every 4s" hx-target="#vue"{% endif %}>
+{% for m in missions %}
+  <div class="mini bm">
+    <div class="bm-corps">
+      <div class="bm-l1">
+        <span class="badge badge-{{ m.statut }}">{{ m.statut }}</span>
+        <span class="heure">{{ m.cree_le }}</span>
+      </div>
+      <div class="bm-consigne">{{ m.consigne }}</div>
+
+      {% if m.statut == 'en_cours' %}
+        <p class="vide">⏳ en cours…</p>
+      {% elif m.statut == 'propose' %}
+        {% if m.journal_liste %}
+          <p class="sous">Journal</p>
+          <ul class="attendu">{% for j in m.journal_liste %}<li>{{ j }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if m.tests %}
+          <p class="sous">Tests</p>
+          <p><span class="badge {{ 'badge-ok' if m.tests.ok else 'badge-echec' }}">{{ 'verts' if m.tests.ok else 'rouges' }}</span> {{ m.tests.resume }}</p>
+        {% endif %}
+        {% if m.diff %}
+          <p class="sous">Diff</p>
+          <pre class="diff">{{ m.diff }}</pre>
+        {% endif %}
+        <div class="actions">
+          <button class="btn primaire" hx-post="/beecham/{{ m.id }}/valider" hx-target="#vue">Fusionner</button>
+          <button class="btn" hx-post="/beecham/{{ m.id }}/rejeter" hx-target="#vue">Jeter</button>
+        </div>
+      {% else %}
+        <p class="vide">Statut : {{ m.statut }}</p>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  <p class="vide">Aucune mission encore.</p>
+{% endfor %}
+</div>

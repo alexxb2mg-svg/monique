@@ -5,6 +5,8 @@ Ne lancer que via les scripts start_secretaire.* (pas au boot tant que la
 bascule n'est pas décidée).
 """
 
+import json
+import threading
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -15,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import actions as actions_mod
+import beecham
 import blueprint
 import boite
 import brief
@@ -332,6 +335,65 @@ def _agents_ctx():
 @app.get("/vue/agents", response_class=HTMLResponse)
 def vue_agents(request: Request):
     return tpl.TemplateResponse(request, "vue_agents.html", _agents_ctx())
+
+
+# --- Onglet « Beecham » (chef d'orchestre) : missions gardées, l'utilisateur valide -------------
+
+
+def _decoder_missions(missions):
+    # journal/tests_json sont des chaînes JSON en base -> décodées ICI (fail-soft), jamais dans Jinja.
+    out = []
+    for m in missions:
+        d = dict(m)
+        try:
+            d["journal_liste"] = json.loads(d.get("journal") or "[]")
+        except (TypeError, ValueError):
+            d["journal_liste"] = []
+        try:
+            d["tests"] = json.loads(d.get("tests_json") or "null")
+        except (TypeError, ValueError):
+            d["tests"] = None
+        out.append(d)
+    return out
+
+
+def _beecham_ctx():
+    missions = _decoder_missions(beecham.lister_missions())
+    return {
+        "missions": missions,
+        "roles": list(beecham.ROLES),
+        "en_cours_actif": any(m.get("statut") == "en_cours" for m in missions),
+    }
+
+
+@app.get("/vue/beecham", response_class=HTMLResponse)
+def vue_beecham(request: Request):
+    return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
+
+
+@app.post("/beecham/mission", response_class=HTMLResponse)
+def creer_mission_beecham(
+    request: Request, consigne: str = Form(...), role: str = Form(...)
+):
+    mid = beecham.demarrer_mission(consigne)
+    # exécution LONGUE (vraie session claude + tests) -> thread de fond, la requête revient de suite ;
+    # la mission passe en_cours -> propose en arrière-plan (le poll htmx du template la rattrape).
+    threading.Thread(
+        target=beecham.executer_mission, args=(mid, role), daemon=True
+    ).start()
+    return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
+
+
+@app.post("/beecham/{mid}/valider", response_class=HTMLResponse)
+def valider_mission_beecham(request: Request, mid: str):
+    beecham.valider(mid)
+    return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
+
+
+@app.post("/beecham/{mid}/rejeter", response_class=HTMLResponse)
+def rejeter_mission_beecham(request: Request, mid: str):
+    beecham.rejeter(mid)
+    return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
 
 
 @app.get("/", response_class=HTMLResponse)

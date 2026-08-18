@@ -16,6 +16,12 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:14p
 .enligne{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--grisdoux)}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--vert);box-shadow:0 0 0 3px rgba(31,138,76,.18)}
 
+/* Carte identité Monique (haut droite) */
+.moniquecard{display:flex;align-items:center;gap:9px;background:var(--papier);
+  border:1.5px solid var(--regle);border-radius:12px;padding:5px 12px 5px 5px}
+.moniquecard .mavatar{width:40px;height:40px;border-radius:9px;object-fit:cover;
+  object-position:center 30%;image-rendering:pixelated;border:1px solid var(--regle);flex:none}
+
 /* onglets */
 .onglets{display:flex;gap:2px;margin:16px 0 0;border-bottom:2px solid var(--regle);flex-wrap:wrap}
 .onglet{font-family:inherit;font-size:14px;font-weight:700;color:var(--grisdoux);background:none;border:none;
@@ -26,6 +32,9 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:14p
 .onglet.actif{color:var(--encre)}
 .onglet.actif::after{content:"";position:absolute;left:6px;right:6px;bottom:-2px;height:3px;
   background:var(--secu);border-radius:3px 3px 0 0}
+.onglet-av{width:24px;height:24px;border-radius:6px;object-fit:cover;object-position:center 30%;
+  image-rendering:pixelated;flex:none;border:1px solid var(--regle)}
+.onglet{opacity:.72}.onglet.actif{opacity:1}.onglet:hover{opacity:1}
 
 #vue{padding-top:24px}
 
@@ -145,3 +154,20 @@ form.parler input{flex:1;font-family:inherit;font-size:13px;border:1.5px solid v
 .vide{color:var(--grisdoux);font-size:14px;padding:8px 2px}
 
 @media(max-width:840px){.colonnes{grid-template-columns:1fr}}
+
+/* Onglet Beecham — chef d'orchestre */
+.bm{display:block}
+.bm-corps{width:100%}
+.bm-l1{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.bm-consigne{font-size:14px;font-weight:600;line-height:1.4;margin-bottom:4px}
+.sous{font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:800;
+  color:var(--grisdoux);margin-top:10px;margin-bottom:4px}
+.badge{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  padding:2px 8px;border-radius:20px;border:1px solid var(--regle);background:var(--fond);color:var(--grisdoux)}
+.badge-en_cours{background:var(--secudoux);color:#7a2e00;border-color:var(--secu)}
+.badge-propose{background:#eef2ff;color:#3446b8;border-color:#dbe1ff}
+.badge-valide,.badge-ok{background:#e8f7ed;color:#1f8a4c;border-color:#cbead6}
+.badge-rejete{background:var(--fond);color:var(--grisdoux)}
+.badge-echec{background:#fde8e8;color:var(--alerte);border-color:#f6c6c6}
+.diff{background:var(--fond);border:1.5px solid var(--regle);border-radius:9px;padding:10px 12px;
+  font-family:ui-monospace,monospace;font-size:12px;line-height:1.4;white-space:pre;overflow:auto;max-height:340px}

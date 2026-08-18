@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS secw_jobs(
 CREATE TABLE IF NOT EXISTS secw_suggestions(
   signature TEXT PRIMARY KEY, compteur INTEGER DEFAULT 0, statut TEXT DEFAULT 'observe',
   exemples TEXT, maj_le TEXT);
+
+-- Beecham (chef d'orchestre) : missions d'évolution de Monique, gardées (l'utilisateur valide).
+-- statut : en_cours | propose | valide | rejete | echec. Tout vit en shadow ; le travail réel
+-- se fait dans une branche git jetable (branche), jamais sur le vrai store.
+CREATE TABLE IF NOT EXISTS secw_beecham_missions(
+  id TEXT PRIMARY KEY, consigne TEXT, statut TEXT DEFAULT 'en_cours', branche TEXT,
+  plan TEXT, agents_json TEXT, journal TEXT, diff TEXT, tests_json TEXT,
+  suggestions_agents TEXT, cree_le TEXT, maj_le TEXT);
 """
 
 
