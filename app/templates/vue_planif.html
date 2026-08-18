@@ -1,0 +1,34 @@
+<div class="besoin-titre">Planificateur</div>
+{% if cree %}<div class="bandeau">Créneau « {{ cree }} » enregistré (méta-job en shadow{% if not prod %} — mode test, aucune tâche Windows créée{% endif %}).</div>{% endif %}
+{% if erreur %}<div class="indispo">{{ erreur }}</div>{% endif %}
+
+<div class="h3">Tâches Windows existantes</div>
+{% for t in taches %}
+<div class="tache">
+  <span class="nom">{{ t.nom }}</span>
+  <span class="meta">{{ t.prochaine or "—" }} · {{ t.statut or "?" }}</span>
+</div>
+{% else %}<p class="vide">Aucune tâche lisible.</p>{% endfor %}
+
+<div class="rupture"></div>
+
+<div class="h3">Programmer un agent</div>
+<form hx-post="/planif/creer" hx-target="#vue">
+  <div class="champ-bloc"><label class="lab">Agent / module</label>
+    <input class="champ" type="text" name="module" placeholder="chercheur"></div>
+  <div class="champ-bloc"><label class="lab">Libellé</label>
+    <input class="champ" type="text" name="libelle" placeholder="veille nocturne"></div>
+  <div class="champ-bloc"><label class="lab">Rythme</label>
+    <select class="champ" name="modele">
+      <option value="quotidien">Chaque jour à…</option>
+      <option value="jours_ouvres">Jours ouvrés à…</option>
+      <option value="toutes_les_n_min">Toutes les N minutes</option>
+    </select></div>
+  <div class="champ-bloc"><label class="lab">Heure (HH:MM) ou minutes</label>
+    <input class="champ" type="text" name="valeur" placeholder="08:00"></div>
+  <div class="actions">
+    <button class="btn primaire" type="submit">Enregistrer le créneau</button>
+    {% if prod %}<button class="btn" type="button" disabled title="câblage prod à finaliser">Appliquer au réel</button>{% endif %}
+  </div>
+  {% if not prod %}<div class="gate">Mode test : les créneaux sont enregistrés en shadow ; aucune vraie tâche Windows n'est créée ni modifiée. Le bouton « Appliquer au réel » n'apparaît qu'en mode prod.</div>{% endif %}
+</form>

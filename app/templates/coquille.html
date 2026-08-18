@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monique</title>
+<link rel="stylesheet" href="/static/ohmie.css">
+<script src="/static/htmx.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="marque">Mon<span class="pt">ique</span><span class="date">{{ date }}</span></div>
+    <span class="enligne"><span class="dot"></span>En ligne</span>
+  </header>
+
+  <nav class="onglets" id="onglets">
+    <button class="onglet actif" hx-get="/vue/jour" hx-target="#vue">Aujourd'hui</button>
+    <button class="onglet" hx-get="/vue/boite" hx-target="#vue">La boîte</button>
+    <button class="onglet" hx-get="/vue/faire" hx-target="#vue">À faire</button>
+    <button class="onglet" hx-get="/vue/relances" hx-target="#vue">Relances</button>
+    <button class="onglet" hx-get="/vue/monitoring" hx-target="#vue">Monitoring</button>
+    <button class="onglet" hx-get="/vue/reglages" hx-target="#vue">Réglages</button>
+    <button class="onglet" hx-get="/vue/planif" hx-target="#vue">Planificateur</button>
+    <button class="onglet" hx-get="/vue/fournisseurs" hx-target="#vue">Fournisseurs</button>
+    <button class="onglet" hx-get="/vue/agents" hx-target="#vue">Agents</button>
+  </nav>
+
+  <section id="vue">{% include "vue_jour.html" %}</section>
+</div>
+
+<script>
+  document.getElementById('onglets').addEventListener('click', function (e) {
+    if (!e.target.classList.contains('onglet')) return;
+    document.querySelectorAll('.onglet').forEach(function (o) { o.classList.remove('actif'); });
+    e.target.classList.add('actif');
+  });
+</script>
+</body>
+</html>

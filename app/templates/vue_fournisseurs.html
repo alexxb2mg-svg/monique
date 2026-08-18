@@ -1,0 +1,32 @@
+<div class="besoin-titre">Fournisseurs &amp; clés</div>
+{% if cle_ok %}<div class="bandeau">Clé enregistrée au coffre.</div>{% endif %}
+
+{% for p in fournisseurs %}
+<div class="prov">
+  <div class="r1" style="display:flex;align-items:center;gap:9px">
+    <span class="pnom">{{ p.nom }}</span>
+    <span class="ptag">{{ p.mode }}</span>
+    {% if p.model %}<span class="meta" style="font-size:11.5px;color:var(--grisdoux)">{{ p.model }}</span>{% endif %}
+  </div>
+  {% if p.env_var %}
+    <div style="margin-top:8px;font-size:12.5px">Clé :
+      {% if p.cle_presente %}<span class="cle-ok">enregistrée</span>{% else %}<span class="cle-non">absente</span>{% endif %}</div>
+    <form hx-post="/fournisseurs/cle" hx-target="#vue" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <input type="hidden" name="env_var" value="{{ p.env_var }}">
+      <input class="champ" type="password" name="valeur" autocomplete="off" placeholder="coller la clé (jamais réaffichée)">
+      <button class="btn" type="submit">Enregistrer au coffre</button>
+    </form>
+  {% else %}
+    <div style="margin-top:8px;font-size:12.5px;color:var(--grisdoux)">Forfait Claude — aucune clé requise, coût facturé 0 (included).</div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<div class="rupture"></div>
+
+<div class="h3">Consommation — secrétaire</div>
+<div class="cartesmon">
+  <div class="mon"><div class="lab">Appels</div><div class="val">{{ usage.calls }}</div></div>
+  <div class="mon"><div class="lab">Tokens entrée</div><div class="val">{{ usage.input_tokens }}</div></div>
+  <div class="mon"><div class="lab">Tokens sortie</div><div class="val">{{ usage.output_tokens }}</div></div>
+</div>

@@ -1,0 +1,24 @@
+{% if not r.disponible %}
+  <div class="indispo">Dolibarr indisponible — {{ r.message }}</div>
+{% else %}
+<div class="colonnes">
+  <div>
+    <div class="h3">Devis sans réponse</div>
+    {% for d in r.devis %}
+    <div class="rel">
+      <div class="r1"><span class="ref">{{ d.ref }}</span><span class="montant">{{ d.montant }}</span></div>
+      <div class="client">{{ d.nom_client or d.socname or "" }}</div>
+    </div>
+    {% else %}<p class="vide">Aucun devis à relancer.</p>{% endfor %}
+  </div>
+  <div>
+    <div class="h3">Factures impayées</div>
+    {% for f in r.factures %}
+    <div class="rel">
+      <div class="r1"><span class="ref">{{ f.ref }}</span><span class="montant">{{ f.montant }}</span></div>
+      <div class="client">{{ f.nom_client or f.socname or "" }}</div>
+    </div>
+    {% else %}<p class="vide">Aucune facture impayée.</p>{% endfor %}
+  </div>
+</div>
+{% endif %}

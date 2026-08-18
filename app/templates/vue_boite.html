@@ -1,0 +1,18 @@
+<div class="md">
+  <div class="liste">
+  {% for it in items %}
+    <div class="row{% if it.traite %} traite{% endif %}"
+         hx-get="/boite/{{ it.id }}" hx-target="#detailpane">
+      <div class="l1">
+        {% if not it.traite %}<span class="neuf"></span>{% endif %}
+        <span class="canal {{ it.source }}">{{ it.source }}</span>
+        <span class="heure">{{ it.timestamp }}</span>
+      </div>
+      <div class="obj">{{ it.apercu }}</div>
+    </div>
+  {% else %}
+    <p class="vide">Boîte vide.</p>
+  {% endfor %}
+  </div>
+  <div id="detailpane"></div>
+</div>

@@ -1,0 +1,42 @@
+# Monique — ne JAMAIS versionner données, secrets, ni ce qui décrit la machine.
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+app/.venv/
+.pytest_cache/
+.ruff_cache/
+build/
+
+# Secrets & environnement (le coffre vit HORS du dépôt, mais on garde-fou)
+*.env
+!*.env.example
+.monique_secrets/
+noms_interdits.txt
+
+# Bac à sable : tout ce que Monique écrit en MODE=test — jamais versionné
+monique_shadow.db
+monique_shadow.db-journal
+monique_shadow.db-wal
+monique_shadow.db-shm
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Spillover : peut contenir des corps de messages (IBAN/RIB) — hors versionnement
+spillover/
+
+# Journaux & logs : activité de la machine, pas du projet
+*.log
+*_audit*
+journal_*
+
+# Config locale machine-spécifique
+ty.toml
+
+# OS
+.DS_Store
+Thumbs.db

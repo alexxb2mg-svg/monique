@@ -1,0 +1,27 @@
+<div class="besoin-titre">La brigade</div>
+<div class="agents">
+{% for a in agents %}
+  <div class="agent">
+    {% if a.avatar %}<img class="avatar" src="{{ a.avatar }}" alt="{{ a.nom }}">{% else %}<div class="avatar vide-av"></div>{% endif %}
+    <div class="ag-corps">
+      <div class="ag-nom">{{ a.nom }}</div>
+      <div class="ag-desc">{{ a.description }}</div>
+      {% if a.triggers %}<div class="trigs">{% for t in a.triggers %}<span class="trig">{{ t }}</span>{% endfor %}</div>{% endif %}
+    </div>
+  </div>
+{% else %}
+  <p class="vide">Aucun agent déclaré.</p>
+{% endfor %}
+</div>
+
+<div class="rupture"></div>
+
+<div class="h3">Nouveaux agents suggérés</div>
+{% for s in suggestions %}
+  <div class="rel">
+    <div class="r1"><span class="ref">{{ s.signature }}</span><span class="montant">×{{ s.compteur }}</span></div>
+    {% if s.exemples %}<div class="client">{{ s.exemples }}</div>{% endif %}
+  </div>
+{% else %}
+  <p class="vide">Aucune suggestion — la couverture actuelle des agents suffit.</p>
+{% endfor %}

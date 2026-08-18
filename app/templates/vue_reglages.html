@@ -1,0 +1,17 @@
+<div class="besoin-titre">Réglages du secrétariat</div>
+{% if enregistre %}<div class="bandeau">Réglages enregistrés.</div>{% endif %}
+<form hx-post="/reglages" hx-target="#vue">
+  <div class="champ-bloc">
+    <label class="lab">Fréquence de veille</label>
+    <select class="champ" name="veille_freq">
+      {% for opt in options_freq %}
+      <option value="{{ opt }}"{% if opt == veille_freq %} selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="champ-bloc">
+    <label class="lab">Canaux surveillés</label>
+    <input class="champ" type="text" name="canaux" value="{{ canaux }}" placeholder="mail,wa,sms">
+  </div>
+  <div class="actions"><button class="btn primaire" type="submit">Enregistrer</button></div>
+</form>

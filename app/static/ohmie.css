@@ -1,0 +1,147 @@
+/* Charte Ohmie — reprise de la maquette validée. Aucune dépendance externe. */
+:root{
+  --papier:#fbfaf7; --fond:#e9e7e1; --encre:#15171b; --grisdoux:#5c6167;
+  --regle:#dcd9d1; --secu:#ff5c00; --secudoux:#ffd9c2; --alerte:#d21f1f; --vert:#1f8a4c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--fond);color:var(--encre);
+  font-family:"Archivo","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1140px;margin:0 auto;padding:22px 22px 70px}
+
+/* en-tête minimal */
+header.top{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.marque{font-weight:800;font-size:23px;letter-spacing:-0.02em}
+.marque .pt{color:var(--secu)}
+.marque .date{font-weight:500;font-size:13px;color:var(--grisdoux);margin-left:10px}
+.enligne{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--grisdoux)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--vert);box-shadow:0 0 0 3px rgba(31,138,76,.18)}
+
+/* onglets */
+.onglets{display:flex;gap:2px;margin:16px 0 0;border-bottom:2px solid var(--regle);flex-wrap:wrap}
+.onglet{font-family:inherit;font-size:14px;font-weight:700;color:var(--grisdoux);background:none;border:none;
+  cursor:pointer;padding:11px 15px 12px;position:relative;display:flex;align-items:center;gap:7px}
+.onglet:hover{color:var(--encre)}
+.onglet .pill{font-size:11px;font-weight:800;background:var(--fond);border:1px solid var(--regle);
+  color:var(--grisdoux);border-radius:20px;padding:1px 8px}
+.onglet.actif{color:var(--encre)}
+.onglet.actif::after{content:"";position:absolute;left:6px;right:6px;bottom:-2px;height:3px;
+  background:var(--secu);border-radius:3px 3px 0 0}
+
+#vue{padding-top:24px}
+
+/* Aujourd'hui */
+.brief{font-size:24px;line-height:1.5;font-weight:500;max-width:34ch;margin-bottom:6px}
+.souligne{position:relative;white-space:nowrap;font-weight:700}
+.souligne::after{content:"";position:absolute;left:-2px;right:-2px;bottom:.06em;height:.42em;
+  background:var(--secudoux);z-index:-1}
+.brief .n{color:var(--secu);font-weight:800}
+.rupture{height:13px;margin:26px 0;background:repeating-linear-gradient(-45deg,#eceae4 0 8px,#e0ddd5 8px 16px)}
+.besoin-titre{font-size:12px;text-transform:uppercase;letter-spacing:.13em;font-weight:800;
+  color:var(--grisdoux);margin-bottom:14px}
+.cartesbrief{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.cb{background:var(--papier);border:1.5px solid var(--regle);border-radius:13px;padding:15px 16px}
+.cb .cbt{font-size:15px;font-weight:700;line-height:1.35}
+.cb .cbd{font-size:13px;color:var(--grisdoux);margin-top:4px;line-height:1.45}
+
+/* boîte (liste lecture seule Phase 1) */
+.liste{display:flex;flex-direction:column;gap:9px}
+.row{background:var(--papier);border:1.5px solid var(--regle);border-radius:11px;padding:11px 12px;text-align:left}
+.row .l1{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.canal{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 6px;
+  border-radius:5px;background:var(--fond);color:var(--grisdoux);border:1px solid var(--regle)}
+.canal.gmail,.canal.mail{background:#eef2ff;color:#3446b8;border-color:#dbe1ff}
+.canal.whatsapp,.canal.wa{background:#e8f7ed;color:#1f8a4c;border-color:#cbead6}
+.exp{font-weight:700;font-size:14px}
+.heure{margin-left:auto;font-size:11px;color:var(--grisdoux)}
+.neuf{width:7px;height:7px;border-radius:50%;background:var(--secu);flex:none}
+.row .obj{font-size:12.5px;color:var(--grisdoux);line-height:1.35}
+.row.traite{opacity:.55}
+
+/* maître-détail (boîte interactive, Phase 2b) */
+.md{display:grid;grid-template-columns:minmax(240px,1fr) minmax(280px,1.4fr);gap:16px;align-items:start}
+.md .row{cursor:pointer}
+.md .row:hover{border-color:var(--secu)}
+#detailpane{background:var(--papier);border:1.5px solid var(--regle);border-radius:13px;
+  padding:16px 17px;min-height:120px}
+.detail .dh{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.detail .dexp{font-weight:700;font-size:14px}
+.detail .sous{font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:800;
+  color:var(--grisdoux);margin-top:12px;margin-bottom:4px}
+.detail .contexte{font-size:13.5px;line-height:1.45}
+.detail .brouillon{background:var(--fond);border:1.5px solid var(--regle);border-radius:9px;
+  padding:10px 12px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+.detail ul.attendu,.detail ul.hors{margin-left:18px;font-size:13px;line-height:1.5}
+.detail .bandeau{background:#e8f7ed;border:1.5px solid var(--vert);color:#155c33;
+  border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600;margin-bottom:10px}
+.detail .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.btn{font-family:inherit;font-size:13px;font-weight:700;border:1.5px solid var(--regle);
+  background:var(--papier);color:var(--encre);border-radius:9px;padding:8px 13px;cursor:pointer}
+.btn:hover{border-color:var(--secu)}
+.btn.primaire{background:var(--secu);border-color:var(--secu);color:#fff}
+form.parler{display:flex;gap:8px;margin-top:14px}
+form.parler input{flex:1;font-family:inherit;font-size:13px;border:1.5px solid var(--regle);
+  border-radius:9px;padding:8px 11px;background:var(--fond)}
+
+@media(max-width:840px){.md{grid-template-columns:1fr}}
+
+/* À faire */
+.mini{background:var(--papier);border:1.5px solid var(--regle);border-radius:11px;padding:11px 13px;
+  margin-bottom:10px;display:flex;gap:11px;align-items:flex-start}
+.check{width:16px;height:16px;border:1.6px solid var(--grisdoux);border-radius:4px;flex:none;margin-top:2px}
+.t{font-size:14px;font-weight:600;line-height:1.35}
+.quand{font-size:11.5px;color:var(--grisdoux);margin-top:2px}
+.quand.retard{color:var(--alerte);font-weight:700}
+
+/* Relances */
+.colonnes{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.h3{font-size:13px;text-transform:uppercase;letter-spacing:.12em;font-weight:800;margin-bottom:12px;color:var(--grisdoux)}
+.rel{background:var(--papier);border:1.5px solid var(--regle);border-radius:11px;padding:12px 13px;margin-bottom:10px}
+.rel .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ref{font-weight:800;font-size:13px}
+.montant{font-weight:800;font-size:13.5px}
+.rel .client{font-size:13px;margin:2px 0 3px}
+.age{font-size:11.5px;color:var(--grisdoux)}
+.indispo{background:var(--secudoux);border:1.5px solid var(--secu);border-radius:11px;padding:13px 15px;
+  font-size:13.5px;color:#7a2e00;font-weight:600}
+
+/* Monitoring */
+.cartesmon{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.mon{background:var(--papier);border:1.5px solid var(--regle);border-radius:12px;padding:15px}
+.mon .lab{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--grisdoux);font-weight:700}
+.mon .val{font-size:24px;font-weight:800;margin-top:5px}
+.mon .val small{font-size:13px;font-weight:600;color:var(--grisdoux)}
+
+/* Services (Réglages / Planificateur / Fournisseurs) */
+.champ{font-family:inherit;font-size:14px;border:1.5px solid var(--regle);border-radius:9px;
+  padding:9px 11px;background:var(--papier);color:var(--encre);width:100%;max-width:360px}
+.lab{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--grisdoux);
+  font-weight:700;display:block;margin-bottom:6px}
+.champ-bloc{margin-bottom:16px}
+.tache{background:var(--papier);border:1.5px solid var(--regle);border-radius:11px;padding:10px 12px;
+  margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.tache .nom{font-weight:700;font-size:13.5px}
+.tache .meta{font-size:11.5px;color:var(--grisdoux);margin-left:auto;white-space:nowrap}
+.prov{background:var(--papier);border:1.5px solid var(--regle);border-radius:12px;padding:14px 15px;margin-bottom:12px}
+.prov .pnom{font-weight:800;font-size:14px}
+.prov .ptag{font-size:11px;font-weight:800;border-radius:20px;padding:1px 8px;border:1px solid var(--regle);color:var(--grisdoux)}
+.cle-ok{color:var(--vert);font-weight:700}
+.cle-non{color:var(--grisdoux)}
+.gate{background:var(--secudoux);border:1.5px solid var(--secu);border-radius:9px;padding:8px 11px;
+  font-size:12.5px;color:#7a2e00;font-weight:600;margin-top:10px}
+
+/* Onglet Agents — la brigade */
+.agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.agent{display:flex;gap:13px;align-items:flex-start;background:var(--papier);
+  border:1.5px solid var(--regle);border-radius:13px;padding:14px 15px}
+.agent .avatar{width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none;
+  border:1.5px solid var(--regle);image-rendering:pixelated}
+.agent .vide-av{background:var(--fond)}
+.ag-nom{font-weight:800;font-size:15px;text-transform:capitalize}
+.ag-desc{font-size:13px;color:var(--grisdoux);line-height:1.4;margin-top:3px}
+.trigs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.trig{font-size:10.5px;font-weight:700;background:var(--fond);border:1px solid var(--regle);
+  color:var(--grisdoux);border-radius:20px;padding:2px 8px}
+
+.vide{color:var(--grisdoux);font-size:14px;padding:8px 2px}
+
+@media(max-width:840px){.colonnes{grid-template-columns:1fr}}

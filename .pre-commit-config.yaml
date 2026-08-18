@@ -1,0 +1,45 @@
+# Hooks pré-commit et pré-push Monique.
+# Activation (geste manuel, une fois) :
+#   pip install pre-commit && pre-commit install --hook-type pre-commit --hook-type pre-push
+#
+# Trois lignes de défense complémentaires :
+#   - gitleaks  : secrets à SIGNATURE (clés, jetons, IBAN)
+#   - anonymat  : identités RÉELLES (noms) que gitleaks ne voit pas — liste hors dépôt
+#   - garde-fou : chemins de poste / journaux / gros fichiers au moment du push
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.2            # ALIGNÉ sur le CI (ci.yml) — sinon dérive de règles
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks        # scan de secrets à signature
+
+  - repo: local
+    hooks:
+      - id: anonymat
+        name: identités réelles (clients, fournisseurs, personnes)
+        # gitleaks ne voit QUE des secrets à signature : un nom propre n'en a aucune.
+        # La liste vit HORS du dépôt (~/.monique_secrets/noms_interdits.txt) ; absente,
+        # le hook passe avec un avertissement (contributeur extérieur).
+        entry: python scripts/verifier_anonymat.py
+        language: system
+        types: [text]
+
+      - id: ty
+        name: types (ty)
+        entry: ty check app
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: garde-fou-machine
+        name: rien qui décrive la machine (chemins de poste, journaux)
+        entry: python scripts/pre_push_garde_fou.py
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

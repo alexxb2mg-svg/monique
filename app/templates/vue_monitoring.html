@@ -1,0 +1,15 @@
+<div class="cartesmon">
+  <div class="mon">
+    <div class="lab">Collecte</div>
+    <div class="val" style="color:{% if m.collecte_active %}var(--vert){% else %}var(--grisdoux){% endif %}">
+      {% if m.collecte_active %}● Active{% else %}○ Inactive{% endif %}</div>
+  </div>
+  <div class="mon">
+    <div class="lab">Dernier passage</div>
+    <div class="val">{{ m.dernier_passage or "—" }}</div>
+  </div>
+  <div class="mon">
+    <div class="lab">Entrées</div>
+    <div class="val">{{ m.entrees_jour }} <small>/ {{ m.a_traiter }} à traiter</small></div>
+  </div>
+</div>

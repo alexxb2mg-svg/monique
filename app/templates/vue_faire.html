@@ -1,0 +1,11 @@
+{% for t in taches %}
+<div class="mini">
+  <span class="check"></span>
+  <div>
+    <div class="t">{{ t.titre }}</div>
+    {% if t.echeance %}<div class="quand{% if en_retard(t.echeance) %} retard{% endif %}">{{ t.echeance }}</div>{% endif %}
+  </div>
+</div>
+{% else %}
+<p class="vide">Rien à faire pour l'instant.</p>
+{% endfor %}

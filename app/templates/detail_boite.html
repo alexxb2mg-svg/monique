@@ -1,0 +1,25 @@
+<div class="detail">
+  <div class="dh"><span class="canal {{ item.source }}">{{ item.source }}</span>
+    <span class="dexp">{{ item.apercu[:60] }}</span></div>
+  {% if resultat_action and resultat_action.get('envoye_reellement') == false %}
+    <p class="bandeau">Brouillon mis en file d'attente — mode test, rien n'est parti.</p>
+  {% endif %}
+  {% if b %}
+    <p class="sous">Ce que j'ai compris</p><p class="contexte">{{ b.contexte }}</p>
+    <p class="sous">Brouillon de réponse</p><div class="brouillon">{{ b.brouillon }}</div>
+    {% if b.attendu %}<p class="sous">Ce qui est attendu de toi</p>
+      <ul class="attendu">{% for x in b.attendu %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {% if b.hors %}<p class="sous">Hors de mon périmètre</p>
+      <ul class="hors">{% for x in b.hors %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    <form class="parler" hx-post="/boite/{{ item.id }}/parler" hx-target="#detailpane">
+      <input type="text" name="consigne" placeholder="Dis-lui comment reprendre le brouillon…" required>
+      <button class="btn" type="submit">Parler à la secrétaire</button>
+    </form>
+    <div class="actions">
+      {% for a in actions %}<button class="btn" hx-post="/boite/{{ item.id }}/{{ a.nom }}" hx-target="#detailpane">{{ a.description }}</button>{% endfor %}
+    </div>
+  {% else %}
+    <p class="contexte">Aucun brouillon encore.</p>
+    <button class="btn primaire" hx-post="/boite/{{ item.id }}/amorcer" hx-target="#detailpane">Amorcer un brouillon</button>
+  {% endif %}
+</div>
