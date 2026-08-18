@@ -96,3 +96,16 @@ def test_lister_missions_recentes_d_abord(tmp_path):
 
     # limit respecté
     assert len(beecham.lister_missions(db, limit=1)) == 1
+
+
+def test_atelier_page_blanche(tmp_path, monkeypatch):
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    beecham.init_atelier()
+    assert (tmp_path / "atelier" / "LISEZMOI.md").exists()
+    # un agent y écrit une note ; on l'observe
+    (tmp_path / "atelier" / "note_chercheur.md").write_text(
+        "trouvaille", encoding="utf-8"
+    )
+    contenu = beecham.lister_atelier()
+    noms = [f["chemin"] for f in contenu]
+    assert "LISEZMOI.md" in noms and "note_chercheur.md" in noms

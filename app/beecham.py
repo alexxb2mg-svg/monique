@@ -24,6 +24,49 @@ from entrepot import connexion_ecriture
 
 RACINE = Path(__file__).resolve().parent.parent  # dépôt Monique (secretaire/)
 WORKTREES = RACINE.parent / ".beecham_worktrees"  # hors dépôt, jamais versionné
+# Atelier partagé : le tableau blanc des agents (notes, plans, messages, trouvailles) ET la
+# fenêtre d'observation de l'utilisateur. Page blanche : Beecham l'organise comme il veut.
+# Zone d'écriture LIBRE autorisée (avec la branche de code) ; tout le reste est refusé.
+ATELIER = RACINE.parent / "atelier"
+
+
+def init_atelier() -> Path:
+    ATELIER.mkdir(parents=True, exist_ok=True)
+    accueil = ATELIER / "LISEZMOI.md"
+    if not accueil.exists():
+        accueil.write_text(
+            "# Atelier de Beecham\n\n"
+            "Espace de travail et de communication partagé de la brigade.\n"
+            "Écrivez ici librement : notes, plans, trouvailles, messages entre agents.\n"
+            "Organisez-le comme bon vous semble — c'est votre page blanche.\n\n"
+            "Rappel de la SEULE règle inviolable : aucune écriture hors de cet atelier et de\n"
+            "la branche de code. Les dossiers de production se LISENT (inspiration), ne se\n"
+            "touchent JAMAIS. Toute action sur la production est fictive, décrite ici.\n",
+            encoding="utf-8",
+        )
+    return ATELIER
+
+
+def lister_atelier() -> list[dict]:
+    """Contenu de l'atelier (pour l'observer). Lecture seule, fail-soft."""
+    if not ATELIER.exists():
+        return []
+    out = []
+    for p in sorted(ATELIER.rglob("*")):
+        if p.is_file():
+            try:
+                taille = p.stat().st_size
+            except OSError:
+                taille = 0
+            out.append(
+                {
+                    "chemin": str(p.relative_to(ATELIER)).replace("\\", "/"),
+                    "octets": taille,
+                }
+            )
+    return out
+
+
 # Windows only : évite le flash de console. 0 ailleurs (le CI tourne sous Linux) — sinon
 # subprocess lève « creationflags is only supported on Windows ».
 CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0

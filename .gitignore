@@ -43,3 +43,6 @@ Thumbs.db
 
 # Worktrees jetables de Beecham (hors dépôt de toute façon)
 .beecham_worktrees/
+
+# Atelier partagé des agents (données de travail vivantes)
+atelier/

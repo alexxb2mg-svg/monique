@@ -53,7 +53,9 @@ def parse_role(agent: str) -> dict:
         "name": meta.get("name", agent),
         "triggers": meta.get("triggers_deterministes", []),
         "description": meta.get("description_routage", ""),
-        "departement": meta.get("departement", "Non affecté"),  # org vivante : Beecham fait grandir
+        "departement": meta.get(
+            "departement", "Non affecté"
+        ),  # org vivante : Beecham fait grandir
         "corps": corps or DEFAUT,
     }
 
