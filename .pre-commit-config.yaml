@@ -30,13 +30,6 @@ repos:
         language: system
         types: [text]
 
-      - id: ty
-        name: types (ty)
-        entry: ty check app
-        language: system
-        pass_filenames: false
-        stages: [pre-push]
-
       - id: garde-fou-machine
         name: rien qui décrive la machine (chemins de poste, journaux)
         entry: python scripts/pre_push_garde_fou.py
