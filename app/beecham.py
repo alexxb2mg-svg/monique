@@ -14,6 +14,7 @@ de nouveaux agents (nommés dans l'esprit de la brigade) — créés seulement a
 """
 
 import json
+import os
 import subprocess
 import sys
 import uuid
@@ -45,6 +46,24 @@ def init_atelier() -> Path:
             encoding="utf-8",
         )
     return ATELIER
+
+
+def zone_ecriture_autorisee(chemin: str, zones: list[str]) -> bool:
+    """LE garde-fou (logique) : une écriture n'est permise que SOUS l'une des zones autorisées
+    (worktree de la mission + atelier). Tout le reste — dossiers de production inclus — est REFUSÉ.
+    Deny-by-default : chemin illisible/hors zone => False. Comparaison normalisée (casse + realpath),
+    anti-`..` (realpath résout les remontées)."""
+    try:
+        cible = os.path.normcase(os.path.realpath(chemin))
+    except Exception:
+        return False
+    for z in zones:
+        if not z:
+            continue
+        base = os.path.normcase(os.path.realpath(z))
+        if cible == base or cible.startswith(base + os.sep):
+            return True
+    return False
 
 
 def lister_atelier() -> list[dict]:
