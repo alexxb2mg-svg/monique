@@ -1,4 +1,8 @@
-# Monique
+<p align="center">
+  <img src="app/static/avatars/secretaire.png" alt="Monique" width="360">
+</p>
+
+<h1 align="center">Monique</h1>
 
 **Une coquille agentique locale et supervisée : des agents IA au-dessus de vos propres
 données, qui lisent le vrai et n'écrivent que du bac à sable tant que vous n'avez pas basculé.**
