@@ -21,6 +21,8 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:14p
   border:1.5px solid var(--regle);border-radius:12px;padding:5px 12px 5px 5px}
 .moniquecard .mavatar{width:40px;height:40px;border-radius:9px;object-fit:cover;
   object-position:center 30%;image-rendering:pixelated;border:1px solid var(--regle);flex:none}
+.agentmeta{display:flex;flex-direction:column;gap:1px}
+.agentnom{font-weight:800;font-size:13px;line-height:1.1}
 
 /* onglets */
 .onglets{display:flex;gap:2px;margin:16px 0 0;border-bottom:2px solid var(--regle);flex-wrap:wrap}
@@ -32,8 +34,6 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:14p
 .onglet.actif{color:var(--encre)}
 .onglet.actif::after{content:"";position:absolute;left:6px;right:6px;bottom:-2px;height:3px;
   background:var(--secu);border-radius:3px 3px 0 0}
-.onglet-av{width:24px;height:24px;border-radius:6px;object-fit:cover;object-position:center 30%;
-  image-rendering:pixelated;flex:none;border:1px solid var(--regle)}
 .onglet{opacity:.72}.onglet.actif{opacity:1}.onglet:hover{opacity:1}
 
 #vue{padding-top:24px}

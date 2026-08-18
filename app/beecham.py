@@ -15,6 +15,7 @@ de nouveaux agents (nommés dans l'esprit de la brigade) — créés seulement a
 
 import json
 import subprocess
+import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,9 @@ from entrepot import connexion_ecriture
 
 RACINE = Path(__file__).resolve().parent.parent  # dépôt Monique (secretaire/)
 WORKTREES = RACINE.parent / ".beecham_worktrees"  # hors dépôt, jamais versionné
-CREATE_NO_WINDOW = 0x08000000
+# Windows only : évite le flash de console. 0 ailleurs (le CI tourne sous Linux) — sinon
+# subprocess lève « creationflags is only supported on Windows ».
+CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 # Agents que Beecham peut missionner (avatars déjà présents). Read/Edit only, jamais Bash.
 ROLES = {

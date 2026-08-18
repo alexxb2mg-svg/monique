@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monique</title>
-<link rel="stylesheet" href="/static/ohmie.css?v=2">
+<link rel="stylesheet" href="/static/ohmie.css?v=3">
 <script src="/static/htmx.min.js"></script>
 </head>
 <body>
@@ -12,22 +12,25 @@
   <header class="top">
     <div class="marque">Mon<span class="pt">ique</span><span class="date">{{ date }}</span></div>
     <div class="moniquecard">
-      <img class="mavatar" src="/static/avatars/secretaire.png" alt="Monique">
-      <span class="enligne"><span class="dot"></span>En ligne</span>
+      <img class="mavatar" id="agentav" src="/static/avatars/secretaire.png" alt="">
+      <div class="agentmeta">
+        <div class="agentnom" id="agentnom">Secrétaire</div>
+        <span class="enligne"><span class="dot"></span>En ligne</span>
+      </div>
     </div>
   </header>
 
   <nav class="onglets" id="onglets">
-    <button class="onglet actif" hx-get="/vue/jour" hx-target="#vue"><img class="onglet-av" src="/static/avatars/secretaire.png" alt="">Aujourd'hui</button>
-    <button class="onglet" hx-get="/vue/boite" hx-target="#vue"><img class="onglet-av" src="/static/avatars/classement.jpg" alt="">La boîte</button>
-    <button class="onglet" hx-get="/vue/faire" hx-target="#vue"><img class="onglet-av" src="/static/avatars/maitre_oeuvre.jpg" alt="">À faire</button>
-    <button class="onglet" hx-get="/vue/relances" hx-target="#vue"><img class="onglet-av" src="/static/avatars/comptable.jpg" alt="">Relances</button>
-    <button class="onglet" hx-get="/vue/monitoring" hx-target="#vue"><img class="onglet-av" src="/static/avatars/veilleur.jpg" alt="">Monitoring</button>
-    <button class="onglet" hx-get="/vue/reglages" hx-target="#vue"><img class="onglet-av" src="/static/avatars/developpeur.jpg" alt="">Réglages</button>
-    <button class="onglet" hx-get="/vue/planif" hx-target="#vue"><img class="onglet-av" src="/static/avatars/technicien.jpg" alt="">Planificateur</button>
-    <button class="onglet" hx-get="/vue/fournisseurs" hx-target="#vue"><img class="onglet-av" src="/static/avatars/documentaliste.jpg" alt="">Fournisseurs</button>
-    <button class="onglet" hx-get="/vue/agents" hx-target="#vue"><img class="onglet-av" src="/static/avatars/orchestrateur.jpg" alt="">Agents</button>
-    <button class="onglet" hx-get="/vue/beecham" hx-target="#vue"><img class="onglet-av" src="/static/avatars/orchestrateur.jpg" alt="">Beecham</button>
+    <button class="onglet actif" hx-get="/vue/jour" hx-target="#vue" data-av="secretaire.png" data-nom="Secrétaire">Aujourd'hui</button>
+    <button class="onglet" hx-get="/vue/boite" hx-target="#vue" data-av="secretaire.png" data-nom="Secrétaire">La boîte</button>
+    <button class="onglet" hx-get="/vue/faire" hx-target="#vue" data-av="maitre_oeuvre.jpg" data-nom="Maître d'œuvre">À faire</button>
+    <button class="onglet" hx-get="/vue/relances" hx-target="#vue" data-av="comptable.jpg" data-nom="Comptable">Relances</button>
+    <button class="onglet" hx-get="/vue/monitoring" hx-target="#vue" data-av="veilleur.jpg" data-nom="Veilleur">Monitoring</button>
+    <button class="onglet" hx-get="/vue/reglages" hx-target="#vue" data-av="developpeur.jpg" data-nom="Développeur">Réglages</button>
+    <button class="onglet" hx-get="/vue/planif" hx-target="#vue" data-av="technicien.jpg" data-nom="Technicien">Planificateur</button>
+    <button class="onglet" hx-get="/vue/fournisseurs" hx-target="#vue" data-av="documentaliste.jpg" data-nom="Documentaliste">Fournisseurs</button>
+    <button class="onglet" hx-get="/vue/agents" hx-target="#vue" data-av="orchestrateur.jpg" data-nom="La brigade">Agents</button>
+    <button class="onglet" hx-get="/vue/beecham" hx-target="#vue" data-av="orchestrateur.jpg" data-nom="Beecham">Beecham</button>
   </nav>
 
   <section id="vue">{% include "vue_jour.html" %}</section>
@@ -35,10 +38,14 @@
 
 <script>
   document.getElementById('onglets').addEventListener('click', function (e) {
-    var b = e.target.closest('.onglet');   // le clic peut atterrir sur l'avatar dans le bouton
+    var b = e.target.closest('.onglet');
     if (!b) return;
     document.querySelectorAll('.onglet').forEach(function (o) { o.classList.remove('actif'); });
     b.classList.add('actif');
+    // l'avatar en haut à droite = l'agent de la page courante
+    var av = b.getAttribute('data-av'), nom = b.getAttribute('data-nom');
+    if (av) document.getElementById('agentav').src = '/static/avatars/' + av;
+    if (nom) document.getElementById('agentnom').textContent = nom;
   });
 </script>
 </body>
