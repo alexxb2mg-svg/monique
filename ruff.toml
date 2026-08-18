@@ -1,0 +1,5 @@
+# Sélection de règles EXPLICITE = lint reproductible quelle que soit la version de ruff.
+# Les défauts de ruff évoluent (0.16 a élargi le set par défaut) ; on fige ici le set
+# classique pycodestyle+pyflakes, celui que le code respecte. À élargir sciemment plus tard.
+[lint]
+select = ["E4", "E7", "E9", "F"]

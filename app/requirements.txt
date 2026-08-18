@@ -1,7 +1,7 @@
-# Épinglé (règle supply-chain). Paquets majeurs et connus uniquement.
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-jinja2==3.1.5
-python-multipart==0.0.20
+# Épinglé (règle supply-chain). Versions corrigées (pip-audit propre au 2026-08-18).
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
+jinja2==3.1.6
+python-multipart==0.0.32
 httpx==0.28.1
-pytest==8.3.4
+pytest==9.1.1

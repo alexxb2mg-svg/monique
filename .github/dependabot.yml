@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Dépendances Python : alerte + PR de mise à jour hebdomadaire (sécurité incluse).
+  - package-ecosystem: "pip"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  # Actions GitHub épinglées : mises à jour de sécurité aussi.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
