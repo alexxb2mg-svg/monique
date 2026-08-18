@@ -4,57 +4,61 @@
 
 <h1 align="center">Monique</h1>
 
-**Une coquille agentique locale et supervisée : des agents IA au-dessus de vos propres
-données, qui lisent le vrai et n'écrivent que du bac à sable tant que vous n'avez pas basculé.**
+<p align="center"><em>Your delightfully paranoid AI secretary. She reads everything, writes nothing you didn't approve, and physically cannot email your ex.</em></p>
 
-Monique est un harnais léger (FastAPI + HTMX, aucun build) pour faire tourner des agents IA
-sur les données d'une petite structure, avec quatre garanties de conception :
+---
 
-1. **Isolation par conception** — Monique *lit le store réel en lecture seule* et *écrit tout
-   dans un bac à sable*. Un seul interrupteur (`SECRETAIRE_MODE=prod`) bascule les écritures
-   vers le réel, le jour où vous le décidez. C'est le cœur.
-2. **Cerveau confiné et interchangeable** — le LLM est appelé **sans aucun outil** (il ne
-   *peut pas* envoyer, écrire ni supprimer de lui-même). Claude via `claude -p` aujourd'hui,
-   une autre API demain (transport interchangeable, clés au coffre).
-3. **Un orchestrateur** — il aiguille chaque demande vers le bon agent-persona (déterministe
-   par provenance → classifieur LLM contraint → défaut sûr), suggère de nouveaux agents quand
-   un motif revient, et délègue des sous-tâches sans risque.
-4. **Humain dans la boucle** — *rien ne part sans votre clic*. Le premier module est une
-   **secrétaire** : tri des messages entrants, brouillons de réponse proposés, relances,
-   rappels, monitoring.
+Meet **Monique** — a local-first, human-in-the-loop shell for running AI agents on *your own* data (your inbox, your files, your little business) without the classic *"oops, the AI just sent 400 emails"* incident.
 
-> Ce que Monique n'est **pas** : ni un chatbot, ni un système autonome qui agit seul, ni
-> verrouillé à un fournisseur. Par défaut, elle tourne en `MODE=test` et ne touche rien.
+Monique has exactly one deeply held belief: **read the real world, write only in her sandbox notebook** — until *you* say otherwise. Everything she does in production hides behind a single switch that you, and only you, get to flip.
 
-## Démarrer
+## Her four house rules
+
+1. **She reads reality; she writes in pencil.** Your real data is opened strictly read-only. Everything Monique writes lands in a sandbox (`MODE=test`, the default). Flip `SECRETAIRE_MODE=prod` the day you trust her. There's a guard that literally *raises an exception* if any code so much as tries to write your real store while in test mode. She takes this seriously.
+
+2. **Her brain lives in a padded cell.** The LLM runs with `--strict-mcp-config` and **zero tools** — no files, no shell, no send button. She *cannot* email, delete, or leak anything, because we took away her scissors. Delegating to a sub-agent is safe by construction: there's simply nothing dangerous to delegate *with*.
+
+3. **An orchestrator that knows who does what.** An incoming request is routed by where it came from (no LLM needed), then by a constrained `claude -p` classifier if she's unsure, then by a safe default (the secretary herself). She even notices recurring work nobody handles and politely suggests hiring a new agent for it.
+
+4. **Nothing leaves the building without your signature.** Draft replies, reminders, follow-ups — Monique *proposes*, you *approve*. The "Send" button doesn't even show up unless you're in prod. She would rather ask twice than send once by mistake.
+
+## What Monique is *not*
+
+A chatbot. An autonomous agent doing things while you sleep. Married to a single AI vendor. Accidentally in production. (She boots in `test` mode and touches absolutely nothing.)
+
+## Her desk
+
+Nine tabs, from *today's briefing* and *the inbox* to *tasks*, *follow-ups*, *monitoring*, plus **Settings**, a **Scheduler**, a **Providers & Keys** vault, and **Agents** — where the whole pixel-art crew lives.
+
+## Quick start
 
 ```bash
 pip install -r app/requirements.txt
-cp .env.example .env          # (optionnel) ajustez les chemins ; sinon défauts sûrs
-cd app && python -m pytest -q # 106 tests
+cp .env.example .env              # optional — sensible defaults otherwise
+cd app && python -m pytest -q     # 106 tests, all green
 python -m uvicorn serveur:app --host 127.0.0.1 --port 8770
 ```
 
-Ouvrez `http://127.0.0.1:8770`. En `MODE=test`, Monique écrit dans un bac à sable
-(`monique_shadow.db`) et n'envoie rien.
-
-## Onglets
-
-Secrétariat — **Aujourd'hui · La boîte · À faire · Relances · Monitoring** ·
-Services — **Réglages · Planificateur · Fournisseurs & Clés** · **Agents** (la brigade).
+Open `http://127.0.0.1:8770`. In test mode she scribbles in a sandbox (`monique_shadow.db`) and sends nothing. Pinky promise.
 
 ## Configuration
 
-Tout se règle par variables d'environnement, avec des défauts sûrs — voir `.env.example`.
-Aucun chemin de poste n'est codé en dur : chaque installation pointe le sien.
+Everything is set via environment variables with safe defaults — see [`.env.example`](.env.example). No machine paths are hardcoded; every install points at its own.
 
-## Sécurité
+## Security
 
-Voir [`SECURITY.md`](SECURITY.md). En bref : les secrets vont dans un **coffre hors du
-dépôt** (jamais dans le code ni un log), le LLM tourne **sans outils**, et le dépôt est
-protégé par `gitleaks` + deux contrôles maison (identités, chemins de poste) en pré-commit
-et en CI.
+Monique is paranoid, and we mean that as the highest compliment:
 
-## Licence
+- **Secrets** live in a vault *outside* the repo (never in code, never in a log, never echoed back).
+- **The brain has no tools**, so a malicious email can't trick her into reading the vault and pasting it into a draft.
+- **The repo itself** is guarded by `gitleaks` (signature secrets), two homemade sentinels — one for real names, one for machine paths — running in pre-commit *and* CI, plus **CodeQL**, **pip-audit**, and **Dependabot**.
 
-MIT — voir [`LICENSE`](LICENSE).
+Details in [`SECURITY.md`](SECURITY.md).
+
+## Stack
+
+FastAPI + HTMX (no build step, no npm, no bundler), SQLite, Python 3.10. 106 tests. That's the whole party.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). Monique believes in your freedom. She just wishes you'd let her draft the release notes.
