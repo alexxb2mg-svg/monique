@@ -13,7 +13,7 @@ jobs:
         with:
           fetch-depth: 0            # gitleaks a besoin de l'historique complet
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
           cache: pip
