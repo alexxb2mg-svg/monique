@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from entrepot import connexion_ecriture
+from entrepot import connexion_ecriture, connexion_lecture
 import executions
 
 LOG = logging.getLogger(__name__)
@@ -368,7 +368,7 @@ def lire_mission(mission_id, chemin=None) -> dict | None:
     # est la plus consultée (page d'accueil de Beecham, poll HTMX toutes les 3s) — un
     # OperationalError non intercepté y remonterait en 500 au lieu d'un fail-soft.
     try:
-        con = connexion_ecriture(chemin)
+        con = connexion_lecture(chemin)
         try:
             r = con.execute(
                 "SELECT * FROM secw_beecham_missions WHERE id=?", (mission_id,)
@@ -396,7 +396,7 @@ def lister_missions(chemin=None, limit=20) -> list[dict]:
     OperationalError non intercepté y remonterait en 500 au lieu d'un fail-soft.
     """
     try:
-        con = connexion_ecriture(chemin)
+        con = connexion_lecture(chemin)
         try:
             rows = con.execute(
                 "SELECT * FROM secw_beecham_missions ORDER BY cree_le DESC LIMIT ?",

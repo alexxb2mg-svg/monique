@@ -113,6 +113,17 @@ def connexion_ecriture(chemin: str | None = None) -> sqlite3.Connection:
         raise
 
 
+def connexion_lecture(chemin: str | None = None) -> sqlite3.Connection:
+    # lecture pure (mode=ro) : jamais de garde test/réel ni de _appliquer_journal — ce sont
+    # des préoccupations d'écriture qui ne s'appliquent pas à une connexion read-only
+    # (même patron que store.connexion_ro).
+    cible = chemin or chemin_ecriture()
+    con = sqlite3.connect(f"file:{cible}?mode=ro", uri=True)
+    con.execute("PRAGMA busy_timeout=8000")
+    con.row_factory = sqlite3.Row
+    return con
+
+
 SCHEMA_CIBLE = 2  # revue migration C1 : incrémenter à chaque palier
 
 
