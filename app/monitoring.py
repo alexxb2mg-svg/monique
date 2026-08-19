@@ -63,6 +63,11 @@ def _sujet(consigne: str) -> str:
     m = re.match(r"^\s*Fichiers?\s+touch[ée]s?\s*:.*?[—-]\s*(.+)$", c, re.IGNORECASE | re.DOTALL)
     if m and m.group(1).strip():
         c = m.group(1).strip()
+    # le boilerplate « verifie disjoint des N autres missions … (…). » précède le VRAI sujet :
+    # on le saute pour ne garder que l'intention métier qui suit la parenthèse.
+    m2 = re.match(r"^v[ée]rifie\s+disjoint.*?\)\.\s*(.+)$", c, re.IGNORECASE | re.DOTALL)
+    if m2 and m2.group(1).strip():
+        c = m2.group(1).strip()
     return " ".join(c.split())[:90]
 
 
