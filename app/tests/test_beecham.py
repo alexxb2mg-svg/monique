@@ -361,6 +361,29 @@ def test_lancer_agent_sans_plan_ni_memoire_ne_casse_pas(tmp_path, monkeypatch):
     assert "fais X" in prompt
 
 
+def test_lancer_agent_indique_chemin_absolu_atelier(tmp_path, monkeypatch):
+    """Le prompt indique le chemin ABSOLU de l'atelier partagé — jamais un chemin relatif,
+    qui écrirait dans un dossier jetable du worktree isolé (invisible du diff git, détruit
+    en fin de mission)."""
+    atelier = _atelier_isole(tmp_path, monkeypatch)
+    atelier.mkdir(parents=True, exist_ok=True)
+    (atelier / "memoire").mkdir(parents=True, exist_ok=True)
+
+    import superviseur
+
+    monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
+    monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
+    appels = []
+    monkeypatch.setattr(beecham.subprocess, "Popen", _subprocess_popen_capture(appels))
+
+    beecham._lancer_agent("developpeur", "fais X", tmp_path)
+
+    assert len(appels) == 1
+    cmd = appels[0]
+    prompt = cmd[cmd.index("-p") + 1]
+    assert str(atelier.resolve()) in prompt
+
+
 def test_garde_fou_ecriture_deny_by_default(tmp_path):
     wt = tmp_path / "worktree"
     atelier = tmp_path / "atelier"
