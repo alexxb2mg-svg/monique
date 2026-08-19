@@ -23,6 +23,7 @@ import blueprint
 import boite
 import brief
 import config
+import digest as digest_module
 import entrepot
 import fournisseurs
 import monitoring
@@ -425,11 +426,13 @@ def _beecham_ctx():
         )
     except OSError:
         digest = ""
+    digest_resume = digest_module.digest_texte(digest, n_dernieres=20)
     return {
         "missions": missions,
         "roles": list(beecham.ROLES),
         "en_cours_actif": any(m.get("statut") == "en_cours" for m in missions),
         "digest": digest,
+        "digest_resume": digest_resume,
         "atelier": beecham.lister_atelier(),
     }
 

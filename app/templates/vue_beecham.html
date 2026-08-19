@@ -16,6 +16,8 @@
 
 <div class="rupture"></div>
 
+{% if digest_resume and digest_resume.total %}<p class="sous">Résumé des {{ digest_resume.total }} dernières entrées : {% for statut, n in digest_resume.compte.items() %}{{ statut }} × {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+
 {% if digest %}
   <div class="h3">Journal de la brigade</div>
   <pre class="diff" style="max-height:180px">{{ digest }}</pre>
