@@ -39,6 +39,7 @@ def brique_test(ctx):
     """Harnais déterministe : diff réel + tests. Diff vide => rien à coder (livré) ; tests
     rouges => rejet immédiat (on ne fusionne jamais du code cassé)."""
     h = ctx["outils"]["harnais"](ctx["worktree"])
+    ctx["h"] = h  # le harnais complet (diff/tests/fichiers) — nécessaire à la clôture (_clore)
     ctx["diff"] = h.get("diff", "")
     ctx["tests_ok"] = h.get("tests_ok", False)
     ctx["tests_resume"] = h.get("tests_resume", "")
