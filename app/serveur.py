@@ -33,6 +33,7 @@ import relances
 import roles
 import secretaire_actions
 import store
+import vue_missions
 
 BASE = Path(__file__).parent
 tpl = Jinja2Templates(directory=str(BASE / "templates"))
@@ -417,6 +418,13 @@ def _beecham_ctx():
 @app.get("/vue/beecham", response_class=HTMLResponse)
 def vue_beecham(request: Request):
     return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
+
+
+@app.get("/missions/actives")
+def missions_actives():
+    """Missions en cours, JSON brut — brique D-10 etape 2. Pas de template : la vue HTML
+    lisible viendra dans une mission separee une fois cette route stable."""
+    return vue_missions.contexte_missions_actives()
 
 
 @app.post("/beecham/mission", response_class=HTMLResponse)
