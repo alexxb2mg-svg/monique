@@ -1,0 +1,14 @@
+<div class="besoin-titre">Usage &amp; coût par agent</div>
+{% for u in usage %}
+  <div class="mini bm">
+    <div class="bm-corps">
+      <div class="bm-l1">
+        <span class="badge badge-{{ u.cost_status }}">{{ u.cost_status }}</span>
+        <span class="heure">{{ u.agent }}</span>
+      </div>
+      <p class="sous">{{ u.calls }} appel(s) · {{ u.input_tokens }} tokens entrée · {{ u.output_tokens }} tokens sortie · {{ "%.4f"|format(u.estimated_cost_usd) }} $ estimé</p>
+    </div>
+  </div>
+{% else %}
+  <p class="vide">Aucun usage enregistré.</p>
+{% endfor %}

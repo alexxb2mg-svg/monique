@@ -34,6 +34,7 @@ import roles
 import secretaire_actions
 import store
 import vue_missions
+import vue_usage
 
 BASE = Path(__file__).parent
 tpl = Jinja2Templates(directory=str(BASE / "templates"))
@@ -432,6 +433,11 @@ def vue_missions_actives_html(request: Request):
     return tpl.TemplateResponse(
         request, "vue_missions_actives.html", {"missions": vue_missions.contexte_missions_actives()}
     )
+
+
+@app.get("/vue/usage", response_class=HTMLResponse)
+def vue_usage_html(request: Request):
+    return tpl.TemplateResponse(request, "vue_usage.html", {"usage": vue_usage.contexte_usage()})
 
 
 @app.post("/beecham/mission", response_class=HTMLResponse)
