@@ -53,6 +53,21 @@ def test_vue_beecham_bloque_montre_les_boutons_escalade(monkeypatch):
     assert 'hx-post="/beecham/m1/rejeter"' in r.text
 
 
+def test_vue_beecham_badge_statut_en_francais(monkeypatch):
+    # le badge affiche un libellé lisible ("Proposé", "Bloqué"...) et pas le statut brut ("propose", "bloque")
+    monkeypatch.setattr(
+        beecham, "lister_missions", lambda chemin=None, limit=20: [_mission_propose()]
+    )
+    r = _client().get("/vue/beecham")
+    assert ">Proposé<" in r.text
+
+    m = _mission_propose()
+    m["statut"] = "bloque"
+    monkeypatch.setattr(beecham, "lister_missions", lambda chemin=None, limit=20: [m])
+    r = _client().get("/vue/beecham")
+    assert ">Bloqué<" in r.text
+
+
 def test_vue_beecham_echappe_le_diff_xss(monkeypatch):
     monkeypatch.setattr(
         beecham, "lister_missions", lambda chemin=None, limit=20: [_mission_propose()]

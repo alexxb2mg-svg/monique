@@ -27,7 +27,7 @@
   <div class="mini bm">
     <div class="bm-corps">
       <div class="bm-l1">
-        <span class="badge badge-{{ m.statut }}">{{ m.statut }}</span>
+        <span class="badge badge-{{ m.statut }}">{{ m.statut_libelle }}</span>
         {% if m.agents %}<span class="agent-tag">{{ m.agents|join(', ') }}</span>{% endif %}
         <span class="heure">{{ m.cree_le }}</span>
       </div>
