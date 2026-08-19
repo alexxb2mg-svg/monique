@@ -13,7 +13,12 @@ def lire_event(event_id: int, chemin: str | None = None) -> dict | None:
     Sert la rédaction de brouillon : la secrétaire doit lire tout le message,
     pas 140 caractères (revue Phase 2b M2). Le spillover de cerveau gère les corps trop gros.
     """
-    con = connexion_ro(chemin or STORE)
+    # FAIL-SOFT : store réel absent/illisible (fresh install) => None, jamais un 500
+    # (même garde que lire_boite ci-dessous).
+    try:
+        con = connexion_ro(chemin or STORE)
+    except Exception:
+        return None
     try:
         r = con.execute(
             "SELECT id, source, raw_content, status, timestamp, processed_at "

@@ -110,8 +110,10 @@ def _item(event_id):
 
 
 def _detail_ctx(event_id):
+    ev = boite.lire_event(event_id)
     return {
         "item": _item(event_id),
+        "contenu_complet": (ev or {}).get("contenu", ""),
         "b": overlays.lire_brouillon(event_id),
         "actions": actions_mod.disponibles(),
         "resultat_action": None,
