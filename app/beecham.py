@@ -14,7 +14,9 @@ de nouveaux agents (nommés dans l'esprit de la brigade) — créés seulement a
 """
 
 import json
+import logging
 import os
+import sqlite3
 import subprocess
 import sys
 import unicodedata
@@ -23,6 +25,8 @@ from datetime import datetime
 from pathlib import Path
 
 from entrepot import connexion_ecriture
+
+LOG = logging.getLogger(__name__)
 
 RACINE = Path(__file__).resolve().parent.parent  # dépôt Monique (secretaire/)
 WORKTREES = RACINE.parent / ".beecham_worktrees"  # hors dépôt, jamais versionné
@@ -359,27 +363,55 @@ def _maj(mission_id, chemin=None, **champs):
 
 
 def lire_mission(mission_id, chemin=None) -> dict | None:
-    con = connexion_ecriture(chemin)
+    # FAIL-SOFT (même patron que store.lire_taches) : sous contention SQLite, cette route
+    # est la plus consultée (page d'accueil de Beecham, poll HTMX toutes les 3s) — un
+    # OperationalError non intercepté y remonterait en 500 au lieu d'un fail-soft.
     try:
-        r = con.execute(
-            "SELECT * FROM secw_beecham_missions WHERE id=?", (mission_id,)
-        ).fetchone()
-        return dict(r) if r else None
-    finally:
-        con.close()
+        con = connexion_ecriture(chemin)
+        try:
+            r = con.execute(
+                "SELECT * FROM secw_beecham_missions WHERE id=?", (mission_id,)
+            ).fetchone()
+            return dict(r) if r else None
+        finally:
+            con.close()
+    except sqlite3.OperationalError as e:
+        if "lock" in str(e).lower():
+            LOG.warning(
+                "beecham: base verrouillée (contention) sur lire_mission(%s): %s",
+                mission_id,
+                e,
+            )
+        return None
+    except Exception:
+        return None
 
 
 def lister_missions(chemin=None, limit=20) -> list[dict]:
-    """Missions récentes (plus récentes d'abord). Lecture seule, jamais de mutation."""
-    con = connexion_ecriture(chemin)
+    """Missions récentes (plus récentes d'abord). Lecture seule, jamais de mutation.
+
+    FAIL-SOFT (même patron que store.lire_taches) : sous contention SQLite, cette route
+    est la plus consultée (page d'accueil de Beecham, poll HTMX toutes les 3s) — un
+    OperationalError non intercepté y remonterait en 500 au lieu d'un fail-soft.
+    """
     try:
-        rows = con.execute(
-            "SELECT * FROM secw_beecham_missions ORDER BY cree_le DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        con.close()
+        con = connexion_ecriture(chemin)
+        try:
+            rows = con.execute(
+                "SELECT * FROM secw_beecham_missions ORDER BY cree_le DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            con.close()
+    except sqlite3.OperationalError as e:
+        if "lock" in str(e).lower():
+            LOG.warning(
+                "beecham: base verrouillée (contention) sur lister_missions: %s", e
+            )
+        return []
+    except Exception:
+        return []
 
 
 def demarrer_mission(consigne, chemin=None) -> str:
