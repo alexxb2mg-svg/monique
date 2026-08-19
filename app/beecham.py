@@ -481,10 +481,10 @@ def valider(mission_id, chemin=None) -> dict:
         "user.email=beecham@users.noreply.github.com",
         "commit",
         "-m",
-        f"beecham: {m['consigne'][:60]}",
+        f"beecham: mission {mission_id}",
     )
     r = _git(
-        RACINE, "merge", "--no-ff", "-m", f"beecham: {m['consigne'][:60]}", m["branche"]
+        RACINE, "merge", "--no-ff", "-m", f"beecham: mission {mission_id}", m["branche"]
     )
     _nettoyer(m["branche"], wt)
     ok = r.returncode == 0
