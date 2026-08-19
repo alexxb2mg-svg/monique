@@ -65,3 +65,13 @@ def test_parse_role_refuse_nom_non_canonique():
     # revue M4 : un nom d'agent hostile ne doit pas servir à un path traversal
     r = roles.parse_role("../../secrets")
     assert r["triggers"] == [] and r["corps"] == roles.DEFAUT
+
+
+def test_chef_dev_visible_dans_annuaire_et_departement_informatique():
+    # V8-1 (Lot chef_dev) : agents/chef_dev/ROLE.md existe dans le VRAI dossier agents/ du
+    # dépôt (pas de tmp_path/monkeypatch ici, comme carte_agents() en production) — le rôle
+    # est déjà fusionné côté beecham.py/tests, seul le ROLE.md manquait à l'annuaire.
+    carte = roles.carte_agents()
+    assert "chef_dev" in carte
+    assert roles.parse_role("chef_dev")["departement"] == "Informatique"
+    assert "chef_dev" in roles.carte_departements()["Informatique"]
