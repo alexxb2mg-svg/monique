@@ -20,7 +20,7 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:14p
 .moniquecard{display:flex;align-items:center;gap:9px;background:var(--papier);
   border:1.5px solid var(--regle);border-radius:12px;padding:5px 12px 5px 5px}
 /* D-4 (2026-08-19) : agrandi sur demande Alex — vérification visuelle en attente, l'agent vision (Qualité) n'a pas encore d'outillage de capture opérationnel */
-.moniquecard .mavatar{width:52px;height:52px;border-radius:9px;object-fit:cover;
+.moniquecard .mavatar{width:78px;height:78px;border-radius:13px;object-fit:cover;
   object-position:center 30%;image-rendering:pixelated;border:1px solid var(--regle);flex:none}
 .agentmeta{display:flex;flex-direction:column;gap:1px}
 .agentnom{font-weight:800;font-size:13px;line-height:1.1}
