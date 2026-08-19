@@ -29,6 +29,7 @@ import entrepot
 import fournisseurs
 import fournisseurs_materiel
 import monitoring
+import nav
 import orchestrateur
 import overlays
 import parametres
@@ -584,5 +585,9 @@ def racine(request: Request):
     return tpl.TemplateResponse(
         request,
         "coquille.html",
-        {"date": date.today().strftime("%d/%m/%Y"), "brief": brief.construire()},
+        {
+            "date": date.today().strftime("%d/%m/%Y"),
+            "brief": brief.construire(),
+            "departements": nav.DEPARTEMENTS,
+        },
     )
