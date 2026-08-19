@@ -23,3 +23,11 @@ def test_estimer_cout_usd():
 
 def test_estimer_cout_usd_modele_inconnu():
     assert catalogue_prix.estimer_cout_usd("anthropic", "inconnu", 100, 100) is None
+
+
+def test_comparer_fournisseurs_trie_par_cout_croissant():
+    nb_modeles_total = sum(len(modeles) for modeles in catalogue_prix.CATALOGUE_PRIX_USD.values())
+    resultats = catalogue_prix.comparer_fournisseurs(1_000_000, 1_000_000)
+    assert len(resultats) == nb_modeles_total
+    for actuel, suivant in zip(resultats, resultats[1:]):
+        assert actuel["cout_usd"] <= suivant["cout_usd"]
