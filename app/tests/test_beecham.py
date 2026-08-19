@@ -167,7 +167,7 @@ def test_garde_fou_ecriture_deny_by_default(tmp_path):
     # REFUSÉ : la production, ailleurs, la racine
     assert not beecham.zone_ecriture_autorisee(str(prod / "app" / "devis.txt"), zones)
     assert not beecham.zone_ecriture_autorisee(str(tmp_path / "hors.txt"), zones)
-    assert not beecham.zone_ecriture_autorisee("C:/Users/PUBLIC/x.txt", zones)
+    assert not beecham.zone_ecriture_autorisee("C:/ailleurs/x.txt", zones)
 
     # REFUSÉ : évasion par .. (realpath résout la remontée)
     assert not beecham.zone_ecriture_autorisee(
