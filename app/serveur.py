@@ -8,6 +8,7 @@ bascule n'est pas décidée).
 import json
 import os
 import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -50,6 +51,22 @@ def _en_retard(echeance: str | None) -> bool:
 tpl.env.globals["en_retard"] = _en_retard
 
 
+def _reconciliation_periodique(intervalle=900):
+    """D-16, trou B : réconciliation CONTINUE du superviseur, pas seulement au
+    boot ou sur clic manuel (`/processus/balayer`). Sans cette boucle, un
+    process qui devient orphelin entre deux boots reste invisible jusqu'au
+    prochain redémarrage du serveur. `auto_tuer=True` est sûr par
+    construction : `superviseur` n'agit QUE sur des PID que Monique a
+    elle-même enregistrés, jamais un tiers (cf. docstring superviseur.py).
+    """
+    while True:
+        try:
+            superviseur.balayer(auto_tuer=True)
+        except Exception:
+            pass
+        time.sleep(intervalle)
+
+
 @asynccontextmanager
 async def lifespan(app):
     # revue D : garantir que la write-DB du mode courant porte les tables secw_ AVANT le
@@ -72,6 +89,10 @@ async def lifespan(app):
         )
     except Exception:
         pass
+    # D-16, trou B : réconciliation périodique pendant que le serveur tourne (pas
+    # seulement au boot / clic manuel) — même patron thread daemon que les missions
+    # Beecham plus bas dans ce fichier.
+    threading.Thread(target=_reconciliation_periodique, daemon=True).start()
     yield
 
 

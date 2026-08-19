@@ -3,7 +3,9 @@ from fastapi.testclient import TestClient
 import beecham
 import brief
 import relances
+import serveur
 import store
+import superviseur
 from serveur import app
 
 
@@ -63,3 +65,23 @@ def test_vue_recherche(monkeypatch):
     assert r.status_code == 200
     assert "diagnostic_d4_nav_departements.md" in r.text
     assert "ROLE.md" not in r.text
+
+
+def test_reconciliation_periodique_appelle_balayer_auto_tuer(monkeypatch):
+    # D-16, trou B : la boucle de fond doit réconcilier avec auto_tuer=True, pas
+    # seulement au boot / clic manuel. On casse la boucle infinie au premier tour
+    # via un faux time.sleep qui lève SystemExit — jamais de vrai sleep en test.
+    appels = []
+    monkeypatch.setattr(superviseur, "balayer", lambda auto_tuer=False: appels.append(auto_tuer))
+
+    def _sleep_qui_coupe(_intervalle):
+        raise SystemExit
+
+    monkeypatch.setattr(serveur.time, "sleep", _sleep_qui_coupe)
+
+    try:
+        serveur._reconciliation_periodique(intervalle=0)
+    except SystemExit:
+        pass
+
+    assert appels == [True]
