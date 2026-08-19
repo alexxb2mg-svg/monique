@@ -240,6 +240,19 @@ def maj_reglages_chercheur(
     )
 
 
+def _recherche_ctx():
+    notes = sorted(
+        (n for n in beecham.lister_atelier() if n["chemin"].startswith("connaissances/")),
+        key=lambda n: n["chemin"],
+    )
+    return {"notes": notes}
+
+
+@app.get("/vue/recherche", response_class=HTMLResponse)
+def vue_recherche(request: Request):
+    return tpl.TemplateResponse(request, "vue_recherche.html", _recherche_ctx())
+
+
 def _planif_ctx(cree=None, erreur=None):
     # lister_taches = LECTURE seule des vraies tâches ; prod-gate pour le bouton « Appliquer »
     return {

@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+import beecham
 import brief
 import relances
 import store
@@ -47,3 +48,18 @@ def test_vue_relances(monkeypatch):
     )
     r = TestClient(app).get("/vue/relances")
     assert r.status_code == 200 and "D26070009" in r.text
+
+
+def test_vue_recherche(monkeypatch):
+    monkeypatch.setattr(
+        beecham,
+        "lister_atelier",
+        lambda: [
+            {"chemin": "connaissances/diagnostic_d4_nav_departements.md", "octets": 4321},
+            {"chemin": "roles/chef_dev/ROLE.md", "octets": 512},
+        ],
+    )
+    r = TestClient(app).get("/vue/recherche")
+    assert r.status_code == 200
+    assert "diagnostic_d4_nav_departements.md" in r.text
+    assert "ROLE.md" not in r.text
