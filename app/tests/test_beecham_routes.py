@@ -102,6 +102,20 @@ def test_vue_beecham_digest_suit_atelier_repointe(monkeypatch, tmp_path):
     assert "DIGEST-ISOLE-TEST" in r.text
 
 
+def test_vue_beecham_affiche_le_resume_du_digest(monkeypatch, tmp_path):
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path)
+    (tmp_path / "journal.md").write_text(
+        "- 2026-08-19T08:00:00.000000 · developpeur · première entrée · valide\n"
+        "- 2026-08-19T08:10:00.000000 · chercheur · deuxième entrée · rejete\n"
+        "- 2026-08-19T08:20:00.000000 · controleur · troisième entrée · valide\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(beecham, "lister_missions", lambda chemin=None, limit=20: [])
+    r = _client().get("/vue/beecham")
+    assert "valide × 2" in r.text
+    assert "rejete × 1" in r.text
+
+
 # --- POST /beecham/mission --------------------------------------------------------------
 
 
