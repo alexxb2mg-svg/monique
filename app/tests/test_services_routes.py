@@ -165,6 +165,24 @@ def test_vue_agents_affiche_brigade_et_suggestions(monkeypatch):
     )  # suggestion affichée
 
 
+def test_vue_agents_regroupe_par_departement(monkeypatch):
+    monkeypatch.setattr(
+        roles,
+        "carte_departements",
+        lambda: {
+            "Secrétariat": {"secretaire": {"description": "mails", "triggers": []}},
+            "Recherche": {"chercheur": {"description": "veille", "triggers": []}},
+        },
+    )
+    monkeypatch.setattr(orchestrateur, "suggerer", lambda chemin=None: [])
+    r = _client().get("/vue/agents")
+    assert r.status_code == 200
+    assert "Secrétariat" in r.text and "secretaire" in r.text
+    assert "Recherche" in r.text and "chercheur" in r.text
+    # le département apparaît comme titre AU-DESSUS de ses agents
+    assert r.text.index("Secrétariat") < r.text.index("secretaire")
+
+
 def test_reglages_autoescape(monkeypatch):
     # revue F : régression XSS — un canal malveillant doit être échappé, jamais rendu brut
     monkeypatch.setattr(

@@ -1,6 +1,8 @@
 <div class="besoin-titre">La brigade</div>
 <div class="agents">
-{% for a in agents %}
+{% for d in departements %}
+  <div class="h3">{{ d.nom }}</div>
+  {% for a in d.agents %}
   <div class="agent">
     {% if a.avatar %}<img class="avatar" src="{{ a.avatar }}" alt="{{ a.nom }}">{% else %}<div class="avatar vide-av"></div>{% endif %}
     <div class="ag-corps">
@@ -9,6 +11,7 @@
       {% if a.triggers %}<div class="trigs">{% for t in a.triggers %}<span class="trig">{{ t }}</span>{% endfor %}</div>{% endif %}
     </div>
   </div>
+  {% endfor %}
 {% else %}
   <p class="vide">Aucun agent déclaré.</p>
 {% endfor %}

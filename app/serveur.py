@@ -321,17 +321,23 @@ def _avatar(nom: str):
 
 
 def _agents_ctx():
-    carte = roles.carte_agents()
-    agents = [
+    carte = roles.carte_departements()
+    departements = [
         {
-            "nom": nom,
-            "description": f.get("description", ""),
-            "triggers": f.get("triggers", []),
-            "avatar": _avatar(nom),
+            "nom": dep,
+            "agents": [
+                {
+                    "nom": nom,
+                    "description": f.get("description", ""),
+                    "triggers": f.get("triggers", []),
+                    "avatar": _avatar(nom),
+                }
+                for nom, f in sorted(agents_dep.items())
+            ],
         }
-        for nom, f in sorted(carte.items())
+        for dep, agents_dep in carte.items()
     ]
-    return {"agents": agents, "suggestions": orchestrateur.suggerer()}
+    return {"departements": departements, "suggestions": orchestrateur.suggerer()}
 
 
 @app.get("/vue/agents", response_class=HTMLResponse)
