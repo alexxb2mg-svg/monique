@@ -75,7 +75,7 @@ def test_lire_mission_verrou_qui_depasse_busy_timeout_echoue_silencieusement(
     def _connexion_verrouillee(_chemin):
         raise sqlite3.OperationalError("database is locked")
 
-    monkeypatch.setattr(beecham, "connexion_ecriture", _connexion_verrouillee)
+    monkeypatch.setattr(beecham, "connexion_lecture", _connexion_verrouillee)
 
     assert beecham.lire_mission(mid, db) is None
 
@@ -88,6 +88,6 @@ def test_lister_missions_verrou_qui_depasse_busy_timeout_echoue_silencieusement(
     def _connexion_verrouillee(_chemin=None):
         raise sqlite3.OperationalError("database is locked")
 
-    monkeypatch.setattr(beecham, "connexion_ecriture", _connexion_verrouillee)
+    monkeypatch.setattr(beecham, "connexion_lecture", _connexion_verrouillee)
 
     assert beecham.lister_missions(db) == []
