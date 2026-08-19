@@ -1,4 +1,14 @@
+import pytest
+
 import relances
+
+
+@pytest.fixture(autouse=True)
+def _vide_cache_relances():
+    # le cache 60s de etat() persiste au niveau module -> le vider avant chaque test,
+    # sinon un test récupère le résultat caché du précédent.
+    relances._CACHE["v"] = None
+    yield
 
 
 class FauxDoli:
