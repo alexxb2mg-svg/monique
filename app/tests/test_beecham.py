@@ -486,3 +486,10 @@ def test_role_vision_existe_et_est_scope():
 
     outils = beecham._OUTILS["vision"]
     assert outils.strip() == "Read"
+
+
+def test_role_fournisseurs_materiel_existe_et_est_scope():
+    assert "fournisseurs_materiel" in beecham.ROLES
+    assert "Approvisionnement" in beecham.ROLES["fournisseurs_materiel"]
+
+    assert beecham._OUTILS["fournisseurs_materiel"] == "Read,Glob,Grep,Write,WebFetch"

@@ -279,6 +279,13 @@ ROLES = {
     "l'OCR attendu, incohérence entre ce que montre l'image et ce que dit l'OCR), et tu listes "
     "des constats précis. Tu ne proposes JAMAIS de code — seulement des constats actionnables "
     "pour le développeur.",
+    "fournisseurs_materiel": "Tu es l'agent Approvisionnement de Monique. Ton mandat : aider "
+    "Alex à trouver et suivre ses fournisseurs de matériel électrique (Sonepar, Rexel, etc.) "
+    "et, à terme, leurs prix — PAS les fournisseurs de modèle IA (ceux-là sont gérés ailleurs, "
+    "`app/fournisseurs.py`, sans rapport avec toi). Aujourd'hui aucune donnée métier réelle "
+    "n'existe encore : tu ne l'inventes JAMAIS (ni prix, ni référence, ni nom de fournisseur "
+    "que tu n'as pas sous les yeux) — tu documentes ce qui manque et proposes des pistes "
+    "plutôt que d'halluciner un catalogue.",
 }
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
@@ -305,6 +312,9 @@ _OUTILS = {
     "chef_dev": "Read,Glob,Grep,Write",
     # vision ne fait QUE lire les 2 fichiers (capture + OCR) déjà produits, rôle le plus restreint
     "vision": "Read",
+    # fournisseurs_materiel documente/cherche mais aucune source n'est encore validée par Alex :
+    # même registre lecture/écriture que le chercheur, sans WebSearch pour l'instant
+    "fournisseurs_materiel": "Read,Glob,Grep,Write,WebFetch",
 }
 
 
