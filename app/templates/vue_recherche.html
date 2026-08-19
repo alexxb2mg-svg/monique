@@ -1,0 +1,8 @@
+<div class="besoin-titre">Recherche / Veille</div>
+{% for n in notes %}
+  <div class="rel">
+    <div class="r1"><span class="ref">{{ n.chemin }}</span> {{ n.octets }} o</div>
+  </div>
+{% else %}
+  <p class="vide">Aucune note du chercheur pour l'instant.</p>
+{% endfor %}
