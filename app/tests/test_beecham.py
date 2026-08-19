@@ -353,3 +353,12 @@ def test_role_planificateur_existe_et_est_scope():
     outils = beecham._OUTILS["planificateur"]
     assert "Bash" not in outils
     assert "Edit" not in outils
+
+
+def test_role_vitrine_existe_et_est_scope():
+    assert "vitrine" in beecham.ROLES
+    texte = beecham.ROLES["vitrine"]
+    assert "Interface" in texte or "lisible" in texte
+
+    outils = beecham._OUTILS["vitrine"]
+    assert "Bash" not in outils

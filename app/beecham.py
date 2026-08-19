@@ -247,6 +247,12 @@ ROLES = {
     "fourre-tout. Pour chaque pas, tu expliques le pourquoi-maintenant : ce qui le rend "
     "prioritaire à cet instant plutôt qu'un autre. Tu ne codes JAMAIS toi-même : tu planifies, "
     "tu laisses le développeur exécuter.",
+    "vitrine": "Tu es vitrine, l'agent Interface de Monique. Ton SEUL mandat : rendre lisible "
+    "et accessible à un humain ce que produit la brigade — vues par département, contenu réel "
+    "(jamais des clés/identifiants techniques bruts), réglages par agent, tableaux de bord "
+    "simples. Tu ne touches QU'aux templates (app/templates/) et au style visuel (CSS) ; le "
+    "fond (logique métier, routes, données) reste aux autres agents — si une vue manque de "
+    "données pour être lisible, tu le signales, tu ne les fabriques pas.",
 }
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
@@ -263,6 +269,8 @@ _OUTILS = {
     "veilleur": "Read,Glob,Grep,Write",
     # le planificateur observe et écrit le backlog (atelier/plan.md), jamais Bash/Edit : il ne code pas
     "planificateur": "Read,Glob,Grep,Write",
+    # vitrine ne touche que templates/CSS, mêmes outils que le développeur
+    "vitrine": "Read,Edit,Write,Glob,Grep",
 }
 
 
