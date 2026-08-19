@@ -371,38 +371,41 @@ def _creer_worktree(branche) -> Path:
     return wt
 
 
-def _lancer_agent(role, consigne, worktree) -> dict:
+def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
     """Session codeur SCOPÉE : Read/Edit/Write only (pas de Bash), cwd=worktree, aucun MCP.
-    Renvoie {ok, journal:[actions], texte}. Mockable en test."""
-    systeme = ROLES.get(role, ROLES["developpeur"])
+    `reprendre`=<session_id> : REPREND la session claude précédente (`--resume`) au lieu d'en
+    rallumer une à froid — l'agent garde sa mémoire de travail (tours de correction) et le cache
+    de prompt reste valide (même session/répertoire). Renvoie {ok, journal, texte, session_id}
+    (session_id à repasser en `reprendre` au tour suivant). Mockable en test."""
+    systeme = ROLES.get(role, ROLES["developpeur"]).replace("\x00", "")
     outils = _OUTILS.get(role, _OUTILS["developpeur"])
-    # Contexte de la brigade : plan.md + mémoire du rôle, en tête du prompt. Fail-soft (même
-    # principe que journal_ajouter) : fichier absent/vide ou erreur de lecture => on ignore
-    # silencieusement ce bloc, la mission ne doit JAMAIS échouer pour ça.
-    contexte = ""
-    try:
-        plan_txt = (ATELIER / "plan.md").read_text(encoding="utf-8")
-        if plan_txt:
-            contexte += f"# Contexte de la brigade (plan.md)\n{plan_txt}\n\n"
-    except OSError:
-        pass
-    try:
-        memoire_txt = chemin_memoire(role).read_text(encoding="utf-8")
-        if memoire_txt:
-            contexte += f"# Mémoire de ton rôle\n{memoire_txt}\n\n"
-    except OSError:
-        pass
-    prompt = (
-        f"{contexte}"
-        f"{consigne}\n\n"
-        "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
-        "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
-        "seront lancés automatiquement après toi. Réponds par un court résumé de ce que tu as fait."
-    )
-    # Anti-octet-nul : Windows CreateProcess refuse tout argument contenant \x00 (ValueError).
-    # Un chemin ou une consigne mal échappé (ex. « \00 ») en glisserait un — on nettoie par sécurité.
-    prompt = prompt.replace("\x00", "")
-    systeme = systeme.replace("\x00", "")
+    if reprendre:
+        # Session reprise : le contexte (plan + mémoire + code déjà lu au tour précédent) est DÉJÀ
+        # dans la session. On n'envoie QUE le message (la correction), pas tout le préfixe réinjecté.
+        prompt = (consigne or "").replace("\x00", "")
+    else:
+        # Contexte de la brigade : plan.md + mémoire du rôle, en tête. Fail-soft : jamais d'échec ici.
+        contexte = ""
+        try:
+            plan_txt = (ATELIER / "plan.md").read_text(encoding="utf-8")
+            if plan_txt:
+                contexte += f"# Contexte de la brigade (plan.md)\n{plan_txt}\n\n"
+        except OSError:
+            pass
+        try:
+            memoire_txt = chemin_memoire(role).read_text(encoding="utf-8")
+            if memoire_txt:
+                contexte += f"# Mémoire de ton rôle\n{memoire_txt}\n\n"
+        except OSError:
+            pass
+        prompt = (
+            f"{contexte}{consigne}\n\n"
+            "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
+            "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
+            "seront lancés automatiquement après toi. Réponds par un court résumé de ce que tu as fait."
+        ).replace(
+            "\x00", ""
+        )  # anti-octet-nul (Windows CreateProcess refuse \x00 -> ValueError)
     settings = (
         _ecrire_garde()
     )  # garde-fou d'écriture (hors dépôt) : refuse tout hors zones
@@ -429,6 +432,11 @@ def _lancer_agent(role, consigne, worktree) -> dict:
         "--append-system-prompt",
         systeme,
     ]
+    if reprendre:
+        cmd += [
+            "--resume",
+            reprendre,
+        ]  # reprend la session -> mémoire de travail + cache conservés
     try:
         proc = subprocess.run(
             cmd,
@@ -446,13 +454,18 @@ def _lancer_agent(role, consigne, worktree) -> dict:
             "ok": False,
             "journal": [f"agent {role}: échec ({type(e).__name__})"],
             "texte": "",
+            "session_id": None,
         }
-    journal, texte = [], ""
+    journal, texte, session_id = [], "", None
     for ligne in (proc.stdout or "").splitlines():
         try:
             ev = json.loads(ligne)
         except Exception:
             continue
+        if ev.get(
+            "session_id"
+        ):  # présent dans system/init ET result -> à réutiliser pour --resume
+            session_id = ev["session_id"]
         if ev.get("type") == "assistant":
             for bloc in ev.get("message", {}).get("content", []):
                 if bloc.get("type") == "tool_use":
@@ -468,7 +481,12 @@ def _lancer_agent(role, consigne, worktree) -> dict:
                     texte += bloc.get("text", "")
         elif ev.get("type") == "result":
             texte = ev.get("result", texte)
-    return {"ok": proc.returncode == 0, "journal": journal, "texte": texte}
+    return {
+        "ok": proc.returncode == 0,
+        "journal": journal,
+        "texte": texte,
+        "session_id": session_id,
+    }
 
 
 def _harnais(worktree) -> dict:
@@ -616,9 +634,12 @@ def executer_mission(
         _maj(mission_id, chemin, statut="echec", journal=json.dumps([str(e)]))
         return {"ok": False, "erreur": str(e)}
 
-    journal, consigne = [], m["consigne"]
+    journal, consigne, session_id = [], m["consigne"], None
     for tour in range(1, max_tours + 1):
-        res = agent(role, consigne, wt)
+        # tour > 1 : on REPREND la session du dev (--resume) — il garde sa mémoire de travail du
+        # tour précédent, on ne réinjecte pas tout le contexte à froid (moins d'overhead + cache gardé).
+        res = agent(role, consigne, wt, reprendre=session_id if tour > 1 else None)
+        session_id = res.get("session_id") or session_id
         journal += res.get("journal", [])
         h = _harnais(wt)
         journal.append(f"harnais · tests: {h['tests_resume'] or '?'}")
@@ -667,11 +688,15 @@ def executer_mission(
             )
         # « corriger » : on renvoie au dev avec la correction, sans repartir de zéro
         if tour < max_tours:
-            consigne = (
-                m["consigne"]
-                + f"\n\n[CORRECTION — tour {tour + 1}] Le contrôleur demande : "
+            correction = (
+                f"[CORRECTION — tour {tour + 1}] Le contrôleur demande : "
                 + raison[:800]
                 + "\nCorrige PRÉCISÉMENT ces points, ne repars pas de zéro."
+            )
+            # session reprenable -> envoyer SEULEMENT la correction (le contexte y est déjà) ;
+            # sinon (pas de session_id) -> repli sûr : re-donner la consigne complète + la correction.
+            consigne = (
+                correction if session_id else (m["consigne"] + "\n\n" + correction)
             )
             journal.append(f"→ correction demandée (tour {tour + 1})")
         else:
