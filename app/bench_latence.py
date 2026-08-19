@@ -20,6 +20,8 @@ ROUTES_A_MESURER = [
     "/vue/fournisseurs",
     "/vue/agents",
     "/vue/beecham",
+    "/vue/usage",
+    "/vue/recherche",
 ]
 
 
