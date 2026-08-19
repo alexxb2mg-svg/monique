@@ -1,13 +1,9 @@
 """Source de vérité unique de la nav à 3 niveaux (département -> persona -> onglets).
 
-Scaffold pur : ce module ne dépend ni de serveur.py ni d'aucun template.
-Il n'est pas encore branché à une route ni à app/templates/coquille.html —
-ça viendra dans une mission future séparée (cf. plan.md, Informatique).
-
-Recopié tel quel depuis la structure réelle de app/templates/coquille.html
-(bloc `{% set arbre = [...] %}` du panneau départements slide-in) au moment
-de l'écriture de ce fichier. En cas de divergence future avec le template,
-ce fichier doit suivre coquille.html, pas l'inverse.
+Ce module EST la source de vérité, déjà branchée : app/serveur.py::racine()
+lit DEPARTEMENTS ici et le passe au contexte, et app/templates/coquille.html
+n'a plus aucun bloc `{% set arbre = [...] %}` codé en dur — il rend
+`departements` reçu du contexte. Ce n'est plus un scaffold en attente.
 
 "La brigade" (/vue/agents) est un département à part entière dans
 coquille.html — un seul groupe, une seule persona, un seul onglet — pas une
@@ -81,7 +77,7 @@ DEPARTEMENTS: list[Departement] = [
                 "nom": "Comptable",
                 "avatar": "comptable.jpg",
                 "onglets": [
-                    {"route": "/vue/relances", "label": "Relances"},
+                    {"route": "/vue/relances", "label": "Relances & factures"},
                 ],
             },
         ],
