@@ -39,7 +39,7 @@ PLAN = ATELIER / "plan.md"
 
 def init_atelier() -> Path:
     ATELIER.mkdir(parents=True, exist_ok=True)
-    MEMOIRE.mkdir(parents=True, exist_ok=True)
+    (ATELIER / "memoire").mkdir(parents=True, exist_ok=True)
     accueil = ATELIER / "LISEZMOI.md"
     if not accueil.exists():
         accueil.write_text(
@@ -52,16 +52,16 @@ def init_atelier() -> Path:
             "touchent JAMAIS. Toute action sur la production est fictive, décrite ici.\n",
             encoding="utf-8",
         )
-    if not JOURNAL.exists():
-        JOURNAL.write_text(
+    if not (ATELIER / "journal.md").exists():
+        (ATELIER / "journal.md").write_text(
             "# Journal\n\n"
             "Digest humain, append-only — une ligne par mission terminée. La trace complète\n"
             "(consigne, diff, tests) reste dans `secw_beecham_missions` (`lister_missions`).\n"
             "Jamais réécrit, seulement complété.\n\n",
             encoding="utf-8",
         )
-    if not PLAN.exists():
-        PLAN.write_text(
+    if not (ATELIER / "plan.md").exists():
+        (ATELIER / "plan.md").write_text(
             "# Plan\n\n"
             "Backlog priorisé des prochains pas, chacun avec son pourquoi-maintenant en une\n"
             "ligne.\n\n",
@@ -76,7 +76,7 @@ def journal_ajouter(agent, resume, statut) -> None:
     init_atelier()
     ligne = f"- {_now()} · {agent} · {resume} · {statut}\n"
     try:
-        with open(JOURNAL, "a", encoding="utf-8") as f:
+        with open(ATELIER / "journal.md", "a", encoding="utf-8") as f:
             f.write(ligne)
     except OSError:
         pass
@@ -86,7 +86,7 @@ def chemin_memoire(role) -> Path:
     """Chemin de la note mémoire d'un agent-persona (atelier/memoire/<role>.md), créée avec
     un en-tête si elle manque."""
     init_atelier()
-    fichier = MEMOIRE / f"{role}.md"
+    fichier = ATELIER / "memoire" / f"{role}.md"
     if not fichier.exists():
         fichier.write_text(
             f"# Mémoire — {role}\n\n"
@@ -365,7 +365,7 @@ def _lancer_agent(role, consigne, worktree) -> dict:
     # silencieusement ce bloc, la mission ne doit JAMAIS échouer pour ça.
     contexte = ""
     try:
-        plan_txt = PLAN.read_text(encoding="utf-8")
+        plan_txt = (ATELIER / "plan.md").read_text(encoding="utf-8")
         if plan_txt:
             contexte += f"# Contexte de la brigade (plan.md)\n{plan_txt}\n\n"
     except OSError:
