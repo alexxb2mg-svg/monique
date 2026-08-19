@@ -233,6 +233,61 @@ def test_chemin_memoire_cree_le_fichier_avec_en_tete(tmp_path, monkeypatch):
     assert "chercheur" in chemin.read_text(encoding="utf-8")
 
 
+def _subprocess_run_capture(appels):
+    """Remplace beecham.subprocess.run : capture `cmd` sans lancer de vrai process."""
+
+    def faux_run(cmd, **kwargs):
+        appels.append(cmd)
+
+        class FauxProc:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return FauxProc()
+
+    return faux_run
+
+
+def test_lancer_agent_injecte_plan_et_memoire(tmp_path, monkeypatch):
+    """Le prompt est précédé du contenu de plan.md et de la mémoire du rôle."""
+    atelier = _atelier_isole(tmp_path, monkeypatch)
+    atelier.mkdir(parents=True, exist_ok=True)
+    (atelier / "memoire").mkdir(parents=True, exist_ok=True)
+    beecham.PLAN.write_text("PLAN-CONNU : refonte du module X\n", encoding="utf-8")
+    (atelier / "memoire" / "developpeur.md").write_text(
+        "MEMOIRE-CONNUE : piège déjà rencontré Y\n", encoding="utf-8"
+    )
+
+    appels = []
+    monkeypatch.setattr(beecham.subprocess, "run", _subprocess_run_capture(appels))
+
+    beecham._lancer_agent("developpeur", "fais X", tmp_path)
+
+    assert len(appels) == 1
+    cmd = appels[0]
+    prompt = cmd[cmd.index("-p") + 1]
+    assert "PLAN-CONNU : refonte du module X" in prompt
+    assert "MEMOIRE-CONNUE : piège déjà rencontré Y" in prompt
+    assert "fais X" in prompt
+
+
+def test_lancer_agent_sans_plan_ni_memoire_ne_casse_pas(tmp_path, monkeypatch):
+    """Fichiers plan.md/mémoire absents : le prompt reste construit sans erreur."""
+    _atelier_isole(tmp_path, monkeypatch)
+    # aucun atelier écrit au préalable : plan.md et memoire/developpeur.md n'existent pas
+
+    appels = []
+    monkeypatch.setattr(beecham.subprocess, "run", _subprocess_run_capture(appels))
+
+    beecham._lancer_agent("developpeur", "fais X", tmp_path)
+
+    assert len(appels) == 1
+    cmd = appels[0]
+    prompt = cmd[cmd.index("-p") + 1]
+    assert "fais X" in prompt
+
+
 def test_garde_fou_ecriture_deny_by_default(tmp_path):
     wt = tmp_path / "worktree"
     atelier = tmp_path / "atelier"
