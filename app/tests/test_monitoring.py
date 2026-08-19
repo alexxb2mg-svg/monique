@@ -1,5 +1,7 @@
 """Monitoring : fail-soft du moteur de collecte + panneau « Chantier de Beecham »."""
 
+import sqlite3
+
 import monitoring
 
 
@@ -13,7 +15,24 @@ def test_etat_moteur_failsoft_db_absente(tmp_path):
         "dernier_passage": None,
         "entrees_jour": 0,
         "a_traiter": 0,
+        "tables_manquantes": [],
     }
+
+
+def test_etat_moteur_tables_manquantes_vide_quand_tout_trouve(tmp_path):
+    """Observabilité (decouverte.diagnostic branché en plus, pas à la place) : quand toutes les
+    tables attendues par BESOINS existent, tables_manquantes est vide."""
+    db = tmp_path / "reel.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+      CREATE TABLE sys_constants(key TEXT PRIMARY KEY, value TEXT);
+      CREATE TABLE sys_incoming_events(id INTEGER PRIMARY KEY, processed_at TEXT, timestamp TEXT);
+      CREATE TABLE sec_taches(id INTEGER PRIMARY KEY, titre TEXT, statut TEXT);
+    """)
+    con.commit()
+    con.close()
+    e = monitoring.etat_moteur(str(db))
+    assert e["tables_manquantes"] == []
 
 
 def test_sujet_nettoie_le_prefixe_fichiers_touches():

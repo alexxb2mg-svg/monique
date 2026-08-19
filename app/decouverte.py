@@ -2,10 +2,12 @@ import sqlite3
 from config import chemin_lecture
 
 # besoin abstrait d'un module → tables réelles candidates (ordre de préférence)
+# NB : "synthese"/"sec_synthese" retiré (diagnostic_decouverte_orphelin.md §3) — besoin
+# anticipé jamais consommé par aucun module de app/*.py ; le laisser signalerait un manque
+# en permanence, jamais actionnable, ce qui rendrait le futur signal "manques" inutilisable.
 BESOINS = {
     "evenements_entrants": ["sys_incoming_events"],
     "taches": ["sec_taches"],
-    "synthese": ["sec_synthese"],
     "constantes": ["sys_constants"],
 }
 
