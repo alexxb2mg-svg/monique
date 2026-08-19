@@ -342,6 +342,17 @@ def vue_agents(request: Request):
 # --- Onglet « Beecham » (chef d'orchestre) : missions gardées, l'utilisateur valide -------------
 
 
+LIBELLES_STATUT = {
+    "en_cours": "En cours",
+    "propose": "Proposé",
+    "valide": "Validé",
+    "rejete": "Rejeté",
+    "echec": "Échec",
+    "livre": "Livré",
+    "bloque": "Bloqué",
+}
+
+
 def _decoder_missions(missions):
     # journal/tests_json sont des chaînes JSON en base -> décodées ICI (fail-soft), jamais dans Jinja.
     out = []
@@ -359,6 +370,7 @@ def _decoder_missions(missions):
             d["agents"] = json.loads(d.get("agents_json") or "[]")
         except (TypeError, ValueError):
             d["agents"] = []
+        d["statut_libelle"] = LIBELLES_STATUT.get(d.get("statut"), (d.get("statut") or "").capitalize())
         out.append(d)
     return out
 
