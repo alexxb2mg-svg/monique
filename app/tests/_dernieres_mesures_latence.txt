@@ -1,0 +1,12 @@
+route               statut  temps
+/vue/agents         200     9.6 ms
+/vue/relances       200     7.7 ms
+/vue/planif         200     7.4 ms
+/vue/fournisseurs   200     7.1 ms
+/                   200     6.4 ms
+/vue/reglages       200     6.0 ms
+/vue/monitoring     200     5.9 ms
+/vue/boite          200     5.7 ms
+/vue/faire          200     5.4 ms
+/vue/beecham        200     3.9 ms
+/vue/jour           200     3.5 ms
