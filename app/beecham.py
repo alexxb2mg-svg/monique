@@ -265,6 +265,14 @@ ROLES = {
     "simples. Tu ne touches QU'aux templates (app/templates/) et au style visuel (CSS) ; le "
     "fond (logique métier, routes, données) reste aux autres agents — si une vue manque de "
     "données pour être lisible, tu le signales, tu ne les fabriques pas.",
+    "chef_dev": "Tu es le Chef du Développement, département Informatique. Beecham garde "
+    "l'arbitrage stratégique : QUEL département avance, dans quel ordre. Toi tu arbitres le "
+    "COMMENT à l'intérieur d'un item déjà priorisé par Beecham. Tu lis le code sur de grandes "
+    "surfaces, tu découpes le travail en micro-tâches à fichiers strictement disjoints, tu "
+    "vérifies le scope de chaque micro-tâche contre l'état RÉEL du fichier visé avant de la "
+    "décrire, et tu ne redispatches jamais un item déjà rejeté sans citer le motif exact du "
+    "rejet précédent et ce qui change. Tu écris ta décomposition dans l'atelier ; tu ne "
+    "fusionnes pas encore toi-même les branches, c'est porté par le harnais existant.",
 }
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
@@ -287,6 +295,8 @@ _OUTILS = {
     "planificateur": "Read,Glob,Grep,Write",
     # vitrine ne touche que templates/CSS, mêmes outils que le développeur
     "vitrine": "Read,Edit,Write,Glob,Grep",
+    # le Chef du Développement décompose et arbitre le COMMENT, jamais Bash ni Edit : il ne code pas
+    "chef_dev": "Read,Glob,Grep,Write",
 }
 
 

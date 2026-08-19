@@ -405,3 +405,13 @@ def test_role_vitrine_existe_et_est_scope():
 
     outils = beecham._OUTILS["vitrine"]
     assert "Bash" not in outils
+
+
+def test_role_chef_dev_existe_et_est_scope():
+    assert "chef_dev" in beecham.ROLES
+    texte = beecham.ROLES["chef_dev"]
+    assert "Informatique" in texte or "scope" in texte
+
+    outils = beecham._OUTILS["chef_dev"]
+    assert "Bash" not in outils
+    assert "Edit" not in outils
