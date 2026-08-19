@@ -220,7 +220,7 @@ form.parler input{flex:1;font-family:inherit;font-size:13px;border:1.5px solid v
   cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;color:var(--encre);text-align:left;border-radius:9px}
 .perso-h:hover,.perso.solo:hover{background:var(--fond)}
 .perso-h span:not(.chev),.perso.solo span{flex:1}
-.av{width:30px;height:30px;border-radius:50%;object-fit:cover;image-rendering:pixelated;border:1px solid var(--regle);flex:none}
+.av{width:44px;height:44px;border-radius:50%;object-fit:cover;image-rendering:pixelated;border:1px solid var(--regle);flex:none}
 .perso .chev{font-size:15px}
 .perso.open>.perso-h .chev{transform:rotate(90deg)}
 .perso-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}
