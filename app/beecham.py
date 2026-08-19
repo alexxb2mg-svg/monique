@@ -412,7 +412,11 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
             f"{contexte}{consigne}\n\n"
             "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
             "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
-            "seront lancés automatiquement après toi. Réponds par un court résumé de ce que tu as fait."
+            "seront lancés automatiquement après toi. Réponds par un court résumé de ce que tu as fait.\n\n"
+            "Si ta consigne te demande d'écrire dans l'atelier partagé (ex. atelier/connaissances/...), "
+            f"utilise le CHEMIN ABSOLU suivant, jamais un chemin relatif : {ATELIER.resolve()} — un "
+            "chemin relatif atelier/... depuis ta copie isolée écrirait dans un dossier jetable, "
+            "invisible et détruit à la fin de la mission."
         ).replace(
             "\x00", ""
         )  # anti-octet-nul (Windows CreateProcess refuse \x00 -> ValueError)
