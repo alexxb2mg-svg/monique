@@ -93,6 +93,15 @@ def test_vue_beecham_en_cours_declenche_le_poll(monkeypatch):
     assert 'hx-trigger="every 3s"' in r.text  # auto-refresh htmx
 
 
+def test_vue_beecham_digest_suit_atelier_repointe(monkeypatch, tmp_path):
+    # le digest doit suivre beecham.ATELIER recalculé à chaque appel, jamais un chemin figé à l'import
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path)
+    (tmp_path / "journal.md").write_text("DIGEST-ISOLE-TEST", encoding="utf-8")
+    monkeypatch.setattr(beecham, "lister_missions", lambda chemin=None, limit=20: [])
+    r = _client().get("/vue/beecham")
+    assert "DIGEST-ISOLE-TEST" in r.text
+
+
 # --- POST /beecham/mission --------------------------------------------------------------
 
 
