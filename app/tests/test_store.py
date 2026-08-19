@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 
 import store
@@ -30,3 +31,25 @@ def test_lire_taches_exclut_reglees_et_trie(tmp_path):
 def test_lire_taches_relance(tmp_path):
     rows = store.lire_taches("relance", _fixture(tmp_path))
     assert len(rows) == 1 and rows[0]["titre"] == "Relancer EFFICIENCE"
+
+
+def test_lire_taches_verrou_est_signale(monkeypatch, caplog):
+    def _lever_verrou(_chemin):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(store, "connexion_ro", _lever_verrou)
+    with caplog.at_level(logging.WARNING):
+        rows = store.lire_taches("a_faire")
+    assert rows == []
+    assert "verrouillée" in caplog.text
+
+
+def test_lire_taches_fichier_absent_reste_silencieux(monkeypatch, caplog):
+    def _lever_absence(_chemin):
+        raise sqlite3.OperationalError("unable to open database file")
+
+    monkeypatch.setattr(store, "connexion_ro", _lever_absence)
+    with caplog.at_level(logging.WARNING):
+        rows = store.lire_taches("a_faire")
+    assert rows == []
+    assert caplog.records == []
