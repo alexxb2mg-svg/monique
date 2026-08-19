@@ -37,3 +37,17 @@ def estimer_cout_usd(fournisseur: str, modele: str, input_tokens: int, output_to
     if p is None:
         return None
     return input_tokens / 1_000_000 * p["entree"] + output_tokens / 1_000_000 * p["sortie"]
+
+
+def comparer_fournisseurs(input_tokens: int, output_tokens: int) -> list[dict]:
+    """Pour un volume de tokens donné, le coût de CHAQUE modèle de CHAQUE fournisseur du
+    catalogue, trié du moins cher au plus cher. Réutilise estimer_cout_usd() — ne duplique
+    pas la formule de coût."""
+    resultats = []
+    for fournisseur, modeles in CATALOGUE_PRIX_USD.items():
+        for modele in modeles:
+            cout = estimer_cout_usd(fournisseur, modele, input_tokens, output_tokens)
+            assert cout is not None  # fournisseur/modele viennent du catalogue, toujours connus
+            resultats.append({"fournisseur": fournisseur, "modele": modele, "cout_usd": cout})
+    resultats.sort(key=lambda r: r["cout_usd"])
+    return resultats
