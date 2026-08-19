@@ -1,16 +1,17 @@
-"""Source de vérité unique de la nav à 2 niveaux (département -> onglets).
+"""Source de vérité unique de la nav à 3 niveaux (département -> persona -> onglets).
 
 Scaffold pur : ce module ne dépend ni de serveur.py ni d'aucun template.
 Il n'est pas encore branché à une route ni à app/templates/coquille.html —
 ça viendra dans une mission future séparée (cf. plan.md, Informatique).
 
 Recopié tel quel depuis la structure réelle de app/templates/coquille.html
-(balise <nav class="onglets" id="onglets">) au moment de l'écriture de ce
-fichier. En cas de divergence future avec le template, ce fichier doit
-suivre coquille.html, pas l'inverse.
+(bloc `{% set arbre = [...] %}` du panneau départements slide-in) au moment
+de l'écriture de ce fichier. En cas de divergence future avec le template,
+ce fichier doit suivre coquille.html, pas l'inverse.
 
-"La brigade" (/vue/agents) est une page transverse, pas un département —
-elle n'apparaît pas dans DEPARTEMENTS.
+"La brigade" (/vue/agents) est un département à part entière dans
+coquille.html — un seul groupe, une seule persona, un seul onglet — pas une
+page transverse exclue de DEPARTEMENTS.
 """
 
 from typing import TypedDict
@@ -19,140 +20,162 @@ from typing import TypedDict
 class Onglet(TypedDict):
     route: str
     label: str
+
+
+class Persona(TypedDict):
+    nom: str
     avatar: str
-    agent: str
+    onglets: list[Onglet]
 
 
 class Departement(TypedDict):
     slug: str
     nom: str
-    onglets: list[Onglet]
+    couleur: str
+    personas: list[Persona]
 
 
 DEPARTEMENTS: list[Departement] = [
     {
         "slug": "direction",
         "nom": "Direction",
-        "onglets": [
+        "couleur": "#7a4f86",
+        "personas": [
             {
-                "route": "/vue/beecham",
-                "label": "Beecham",
+                "nom": "Beecham",
                 "avatar": "orchestrateur.jpg",
-                "agent": "Beecham",
+                "onglets": [
+                    {"route": "/vue/beecham", "label": "Beecham"},
+                ],
             },
         ],
     },
     {
         "slug": "secretariat",
         "nom": "Secrétariat",
-        "onglets": [
+        "couleur": "#c56a3a",
+        "personas": [
             {
-                "route": "/vue/jour",
-                "label": "Aujourd'hui",
+                "nom": "Secrétaire",
                 "avatar": "secretaire.png",
-                "agent": "Secrétaire",
+                "onglets": [
+                    {"route": "/vue/jour", "label": "Aujourd'hui"},
+                    {"route": "/vue/boite", "label": "La boîte"},
+                ],
             },
             {
-                "route": "/vue/boite",
-                "label": "La boîte",
-                "avatar": "secretaire.png",
-                "agent": "Secrétaire",
-            },
-            {
-                "route": "/vue/faire",
-                "label": "À faire",
+                "nom": "Maître d'œuvre",
                 "avatar": "maitre_oeuvre.jpg",
-                "agent": "Maître d'œuvre",
+                "onglets": [
+                    {"route": "/vue/faire", "label": "À faire"},
+                ],
             },
         ],
     },
     {
         "slug": "comptabilite",
         "nom": "Comptabilité",
-        "onglets": [
+        "couleur": "#1f8a4c",
+        "personas": [
             {
-                "route": "/vue/relances",
-                "label": "Relances",
+                "nom": "Comptable",
                 "avatar": "comptable.jpg",
-                "agent": "Comptable",
+                "onglets": [
+                    {"route": "/vue/relances", "label": "Relances"},
+                ],
             },
         ],
     },
     {
         "slug": "informatique",
         "nom": "Informatique",
-        "onglets": [
+        "couleur": "#3f6d8a",
+        "personas": [
             {
-                "route": "/vue/monitoring",
-                "label": "Monitoring",
-                "avatar": "veilleur.jpg",
-                "agent": "Veilleur",
-            },
-            {
-                "route": "/vue/reglages",
-                "label": "Réglages",
+                "nom": "Développeur",
                 "avatar": "developpeur.jpg",
-                "agent": "Développeur",
+                "onglets": [
+                    {"route": "/vue/reglages", "label": "Réglages"},
+                ],
             },
             {
-                "route": "/vue/usage",
-                "label": "Coût",
-                "avatar": "veilleur.jpg",
-                "agent": "Veilleur",
-            },
-            {
-                "route": "/vue/fournisseurs",
-                "label": "Fournisseurs",
+                "nom": "Documentaliste",
                 "avatar": "documentaliste.jpg",
-                "agent": "Documentaliste",
+                "onglets": [
+                    {"route": "/vue/fournisseurs", "label": "Fournisseurs modèles IA"},
+                ],
             },
         ],
     },
     {
         "slug": "approvisionnement",
         "nom": "Approvisionnement",
-        "onglets": [
+        "couleur": "#d2691e",
+        "personas": [
             {
-                "route": "/vue/fournisseurs-materiel",
-                "label": "Fournisseurs matériel",
-                "avatar": "technicien.jpg",
-                "agent": "Approvisionnement",
+                "nom": "Approvisionnement",
+                "avatar": "fournisseurs_materiel.jpg",
+                "onglets": [
+                    {"route": "/vue/fournisseurs-materiel", "label": "Fournisseurs matériel"},
+                ],
             },
         ],
     },
     {
         "slug": "pilotage",
         "nom": "Pilotage",
-        "onglets": [
+        "couleur": "#b3803a",
+        "personas": [
             {
-                "route": "/vue/planif",
-                "label": "Planificateur",
+                "nom": "Technicien",
                 "avatar": "technicien.jpg",
-                "agent": "Technicien",
+                "onglets": [
+                    {"route": "/vue/planif", "label": "Planificateur"},
+                ],
             },
         ],
     },
     {
         "slug": "infra_surveillance_systeme",
         "nom": "Infra & Surveillance Système",
-        "onglets": [
+        "couleur": "#557089",
+        "personas": [
             {
-                "route": "/vue/processus",
-                "label": "Système",
+                "nom": "Veilleur",
                 "avatar": "veilleur.jpg",
-                "agent": "Veilleur",
+                "onglets": [
+                    {"route": "/vue/monitoring", "label": "Monitoring"},
+                    {"route": "/vue/processus", "label": "Système"},
+                    {"route": "/vue/usage", "label": "Coût"},
+                ],
             },
         ],
     },
     {
         "slug": "recherche_veille",
         "nom": "Recherche / Veille",
-        "onglets": [
+        "couleur": "#2c8a8a",
+        "personas": [
             {
-                "route": "/vue/recherche",
-                "label": "Recherche",
+                "nom": "Chercheur",
                 "avatar": "chercheur.jpg",
-                "agent": "Chercheur",
+                "onglets": [
+                    {"route": "/vue/recherche", "label": "Recherche"},
+                ],
+            },
+        ],
+    },
+    {
+        "slug": "la_brigade",
+        "nom": "La brigade",
+        "couleur": "#9a5b3f",
+        "personas": [
+            {
+                "nom": "La brigade",
+                "avatar": "orchestrateur.jpg",
+                "onglets": [
+                    {"route": "/vue/agents", "label": "Agents"},
+                ],
             },
         ],
     },
