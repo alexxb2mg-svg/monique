@@ -228,10 +228,13 @@ def appeler(
             "usage": None,
         }
 
-    cout_status = "included" if profile.mode == "claude_cli" else "estimated"
     cout = tarifs.estimer_cout_usd(
         profile.model, res.get("input_tokens", 0), res.get("output_tokens", 0)
     )
+    if cout is None:
+        cout_status, cout = "unknown", 0.0
+    else:
+        cout_status = "included" if profile.mode == "claude_cli" else "estimated"
     usage.compter(
         agent,
         profile.model,
@@ -239,7 +242,7 @@ def appeler(
         task,
         res.get("input_tokens", 0),
         res.get("output_tokens", 0),
-        estimated_cost_usd=cout if cout is not None else 0.0,
+        estimated_cost_usd=cout,
         cost_status=cout_status,
         chemin=chemin,
     )

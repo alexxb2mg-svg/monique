@@ -139,6 +139,35 @@ def test_appeler_route_vers_openai_compat(tmp_path, monkeypatch):
     assert c["calls"] == 1 and c["input_tokens"] == 10
 
 
+def test_appeler_modele_non_tarife_cost_status_unknown(tmp_path, monkeypatch):
+    db = _db(tmp_path)
+    monkeypatch.setattr(estop, "engage", lambda: False)
+    monkeypatch.setattr(
+        cerveau,
+        "_lancer_openai_compat",
+        lambda prompt, system, prof: {
+            "ok": True,
+            "texte": "Bonjour",
+            "input_tokens": 10,
+            "output_tokens": 4,
+        },
+    )
+    r = cerveau.appeler(
+        "secretaire", "salut", PROF_OPENAI_COMPAT, "brouillon", chemin=db
+    )
+    assert r["ok"] and r["texte"] == "Bonjour"
+    con = entrepot.connexion_ecriture(db)
+    try:
+        c = con.execute(
+            "SELECT cost_status, estimated_cost_usd FROM secw_model_usage"
+            " WHERE agent='secretaire'"
+        ).fetchone()
+    finally:
+        con.close()
+    assert c["cost_status"] == "unknown"
+    assert c["estimated_cost_usd"] == 0.0
+
+
 def test_spillover_tronque(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cerveau, "SPILL_DIR", tmp_path / "spill"
