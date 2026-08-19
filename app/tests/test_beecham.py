@@ -37,6 +37,18 @@ def _agent_ecrit(nom, contenu="VALEUR = 42\n"):
     return faux_agent
 
 
+def _execution(db, mission_id):
+    """Relit la ligne secw_executions de la mission (registre D-16, câblé dans executer_mission)."""
+    con = entrepot.connexion_ecriture(db)
+    try:
+        return con.execute(
+            "SELECT statut, delivery_outcome FROM secw_executions WHERE id=?",
+            (mission_id,),
+        ).fetchone()
+    finally:
+        con.close()
+
+
 def _controleur_qui_dit(texte):
     """Agent factice : le contrôleur renvoie EXACTEMENT `texte` — pour tester le parse du verdict."""
 
@@ -126,6 +138,9 @@ def test_traitement_auto_accepte_fusionne(tmp_path, monkeypatch):
     assert r["statut"] == "valide"
     assert (repo / "app" / "bonjour.py").exists()  # fusionné dans main, tout seul
     assert beecham.lire_mission(mid, db)["statut"] == "valide"
+    exe = _execution(db, mid)  # registre D-16 : accepté + fusionné -> completed/delivered
+    assert exe["statut"] == "completed"
+    assert exe["delivery_outcome"] == "delivered"
 
 
 def test_traitement_auto_rejete_abandonne(tmp_path, monkeypatch):
@@ -151,6 +166,9 @@ def test_traitement_auto_rejete_abandonne(tmp_path, monkeypatch):
     assert r["statut"] == "rejete"
     assert not (repo / "app" / "jetable.py").exists()
     assert beecham.lire_mission(mid, db)["statut"] == "rejete"
+    exe = _execution(db, mid)  # registre D-16 : rejeté -> failed, jamais delivered
+    assert exe["statut"] == "failed"
+    assert exe["delivery_outcome"] is None
 
 
 def test_rejet_grave_la_lecon_dans_memoire_developpeur(tmp_path, monkeypatch):
@@ -198,6 +216,9 @@ def test_mission_atelier_auto_livree(tmp_path, monkeypatch):
     r = beecham.executer_mission(mid, chemin=db, _agent=agent_sans_code)
     assert r["statut"] == "livre"
     assert beecham.lire_mission(mid, db)["statut"] == "livre"
+    exe = _execution(db, mid)  # registre D-16 : livré sans code -> completed, pas de livraison
+    assert exe["statut"] == "completed"
+    assert exe["delivery_outcome"] is None
 
 
 def test_corriger_puis_bloque_au_plafond(tmp_path, monkeypatch):
@@ -226,6 +247,9 @@ def test_corriger_puis_bloque_au_plafond(tmp_path, monkeypatch):
     assert r["statut"] == "bloque"
     assert tours["n"] == 2  # exactement max_tours, pas de boucle infinie
     assert beecham.lire_mission(mid, db)["statut"] == "bloque"
+    exe = _execution(db, mid)  # registre D-16 : bloqué au plafond -> failed, pas de livraison
+    assert exe["statut"] == "failed"
+    assert exe["delivery_outcome"] is None
 
 
 def test_lancer_controleur_trois_verdicts(tmp_path):
