@@ -33,9 +33,34 @@ def construire(chemin: str | None = None) -> dict:
         f"Ce matin, {mails} message(s) attendent une réponse, "
         f"{rel} relance(s) à valider, et {retard} tâche(s) en retard."
     )
+
+    # Pouls de la brigade (ce que Monique se construit) — fail-soft, jamais un 500 sur l'accueil.
+    try:
+        import monitoring
+
+        chantier = monitoring.chantier_brigade(limit=40)
+    except Exception:
+        chantier = {"disponible": False, "en_cours": [], "fusionnes": [], "compte": {}}
+
+    # Santé système (registre des process) — n vivants + orphelins éventuels.
+    try:
+        import superviseur
+
+        vivants = [x for x in superviseur.etat() if x.get("vivant")]
+        orph = superviseur.orphelins_vivants() or []
+        systeme = {
+            "vivants": len(vivants),
+            "orphelins": len(orph),
+            "noms": [x["nom"] for x in vivants],
+        }
+    except Exception:
+        systeme = {"vivants": 0, "orphelins": 0, "noms": []}
+
     return {
         "mails_a_traiter": mails,
         "relances": rel,
         "taches_retard": retard,
         "phrase": phrase,
+        "chantier": chantier,
+        "systeme": systeme,
     }

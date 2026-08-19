@@ -6,13 +6,18 @@
 <title>Monique</title>
 <link rel="icon" type="image/x-icon" href="/static/monique.ico">
 <link rel="apple-touch-icon" href="/static/avatars/secretaire.png">
-<link rel="stylesheet" href="/static/ohmie.css?v=4">
+<link rel="stylesheet" href="/static/ohmie.css?v=5">
 <script src="/static/htmx.min.js"></script>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="marque">Mon<span class="pt">ique</span><span class="date">{{ date }}</span></div>
+    <div class="topleft">
+      <button id="menubtn" class="menubtn" aria-label="Ouvrir le menu des départements" aria-expanded="false">
+        <span class="bars"><span></span><span></span><span></span></span>
+      </button>
+      <div class="marque">Mon<span class="pt">ique</span><span class="date">{{ date }}</span></div>
+    </div>
     <div class="moniquecard">
       <img class="mavatar" id="agentav" src="/static/avatars/secretaire.png" alt="">
       <div class="agentmeta">
@@ -22,45 +27,119 @@
     </div>
   </header>
 
-  <nav class="onglets" id="onglets">
-    <span class="sous">Direction</span>
-    <button class="onglet" hx-get="/vue/beecham" hx-target="#vue" data-av="orchestrateur.jpg" data-nom="Beecham">Beecham</button>
-    <span class="sous">Secrétariat</span>
-    <button class="onglet actif" hx-get="/vue/jour" hx-target="#vue" data-av="secretaire.png" data-nom="Secrétaire">Aujourd'hui</button>
-    <button class="onglet" hx-get="/vue/boite" hx-target="#vue" data-av="secretaire.png" data-nom="Secrétaire">La boîte</button>
-    <button class="onglet" hx-get="/vue/faire" hx-target="#vue" data-av="maitre_oeuvre.jpg" data-nom="Maître d'œuvre">À faire</button>
-    <span class="sous">Comptabilité</span>
-    <button class="onglet" hx-get="/vue/relances" hx-target="#vue" data-av="comptable.jpg" data-nom="Comptable">Relances</button>
-    <span class="sous">Informatique</span>
-    <button class="onglet" hx-get="/vue/monitoring" hx-target="#vue" data-av="veilleur.jpg" data-nom="Veilleur">Monitoring</button>
-    <button class="onglet" hx-get="/vue/reglages" hx-target="#vue" data-av="developpeur.jpg" data-nom="Développeur">Réglages</button>
-    <button class="onglet" hx-get="/vue/usage" hx-target="#vue" data-av="veilleur.jpg" data-nom="Veilleur">Coût</button>
-    <button class="onglet" hx-get="/vue/fournisseurs" hx-target="#vue" data-av="documentaliste.jpg" data-nom="Documentaliste">Fournisseurs</button>
-    <span class="sous">Approvisionnement</span>
-    <button class="onglet" hx-get="/vue/fournisseurs-materiel" hx-target="#vue" data-av="technicien.jpg" data-nom="Approvisionnement">Fournisseurs matériel</button>
-    <span class="sous">Pilotage</span>
-    <button class="onglet" hx-get="/vue/planif" hx-target="#vue" data-av="technicien.jpg" data-nom="Technicien">Planificateur</button>
-    <span class="sous">Infra &amp; Surveillance Système</span>
-    <button class="onglet" hx-get="/vue/processus" hx-target="#vue" data-av="veilleur.jpg" data-nom="Veilleur">Système</button>
-    <span class="sous">Recherche / Veille</span>
-    <button class="onglet" hx-get="/vue/recherche" hx-target="#vue" data-av="chercheur.jpg" data-nom="Chercheur">Recherche</button>
-    <span class="sous">La brigade</span>
-    <button class="onglet" hx-get="/vue/agents" hx-target="#vue" data-av="orchestrateur.jpg" data-nom="La brigade">Agents</button>
-  </nav>
-
   <section id="vue">{% include "vue_jour.html" %}</section>
 </div>
 
+<!-- Panneau départements (slide-in gauche) -->
+<div id="drawer" class="drawer" hidden>
+  <div class="scrim" data-close></div>
+  <aside class="panel" role="navigation" aria-label="Départements">
+    <div class="panel-head">
+      <span>Départements</span>
+      <button class="panel-x" data-close aria-label="Fermer">×</button>
+    </div>
+    <div class="arbo">
+      {% set arbre = [
+        ("Direction", "#7a4f86", [
+          ("Beecham", "orchestrateur.jpg", [("Beecham", "/vue/beecham")]),
+        ]),
+        ("Secrétariat", "#c56a3a", [
+          ("Secrétaire", "secretaire.png", [("Aujourd'hui", "/vue/jour"), ("La boîte", "/vue/boite")]),
+          ("Maître d'œuvre", "maitre_oeuvre.jpg", [("À faire", "/vue/faire")]),
+        ]),
+        ("Comptabilité", "#1f8a4c", [
+          ("Comptable", "comptable.jpg", [("Relances", "/vue/relances")]),
+        ]),
+        ("Informatique", "#3f6d8a", [
+          ("Veilleur", "veilleur.jpg", [("Monitoring", "/vue/monitoring"), ("Coût", "/vue/usage")]),
+          ("Développeur", "developpeur.jpg", [("Réglages", "/vue/reglages")]),
+          ("Documentaliste", "documentaliste.jpg", [("Fournisseurs", "/vue/fournisseurs")]),
+        ]),
+        ("Approvisionnement", "#d2691e", [
+          ("Approvisionnement", "fournisseurs_materiel.jpg", [("Fournisseurs matériel", "/vue/fournisseurs-materiel")]),
+        ]),
+        ("Pilotage", "#b3803a", [
+          ("Technicien", "technicien.jpg", [("Planificateur", "/vue/planif")]),
+        ]),
+        ("Infra & Surveillance Système", "#557089", [
+          ("Veilleur", "veilleur.jpg", [("Système", "/vue/processus")]),
+        ]),
+        ("Recherche / Veille", "#2c8a8a", [
+          ("Chercheur", "chercheur.jpg", [("Recherche", "/vue/recherche")]),
+        ]),
+        ("La brigade", "#9a5b3f", [
+          ("La brigade", "orchestrateur.jpg", [("Agents", "/vue/agents")]),
+        ]),
+      ] %}
+      {% for dep, coul, persos in arbre %}
+      <div class="dep">
+        <button class="dep-h" type="button">
+          <span class="pastille" style="background:{{ coul }}"></span>
+          <span class="dep-nom">{{ dep }}</span>
+          <span class="chev">›</span>
+        </button>
+        <div class="dep-body"><div class="dep-inner">
+          {% for perso, av, vues in persos %}
+          {% if vues|length == 1 %}
+            <button class="perso solo vuelink" type="button"
+                    hx-get="{{ vues[0][1] }}" hx-target="#vue"
+                    data-av="{{ av }}" data-nom="{{ perso }}">
+              <img class="av" src="/static/avatars/{{ av }}" alt=""><span>{{ perso }}</span>
+            </button>
+          {% else %}
+            <div class="perso">
+              <button class="perso-h" type="button">
+                <img class="av" src="/static/avatars/{{ av }}" alt=""><span>{{ perso }}</span>
+                <span class="chev">›</span>
+              </button>
+              <div class="perso-body"><div class="perso-inner">
+                {% for label, url in vues %}
+                <button class="vuelink" type="button" hx-get="{{ url }}" hx-target="#vue"
+                        data-av="{{ av }}" data-nom="{{ perso }}">{{ label }}</button>
+                {% endfor %}
+              </div></div>
+            </div>
+          {% endif %}
+          {% endfor %}
+        </div></div>
+      </div>
+      {% endfor %}
+    </div>
+  </aside>
+</div>
+
 <script>
-  document.getElementById('onglets').addEventListener('click', function (e) {
-    var b = e.target.closest('.onglet');
-    if (!b) return;
-    document.querySelectorAll('.onglet').forEach(function (o) { o.classList.remove('actif'); });
-    b.classList.add('actif');
-    // l'avatar en haut à droite = l'agent de la page courante
-    var av = b.getAttribute('data-av'), nom = b.getAttribute('data-nom');
-    if (av) document.getElementById('agentav').src = '/static/avatars/' + av;
-    if (nom) document.getElementById('agentnom').textContent = nom;
+  var drawer = document.getElementById('drawer');
+  var menubtn = document.getElementById('menubtn');
+
+  function openDrawer(){ drawer.hidden = false; requestAnimationFrame(function(){ drawer.classList.add('open'); }); menubtn.setAttribute('aria-expanded','true'); }
+  function closeDrawer(){ drawer.classList.remove('open'); menubtn.setAttribute('aria-expanded','false'); setTimeout(function(){ drawer.hidden = true; }, 260); }
+
+  menubtn.addEventListener('click', openDrawer);
+  drawer.addEventListener('click', function(e){ if (e.target.closest('[data-close]')) closeDrawer(); });
+
+  // Accordéon départements : un seul ouvert à la fois
+  drawer.querySelectorAll('.dep-h').forEach(function(h){
+    h.addEventListener('click', function(){
+      var dep = h.parentElement;
+      var wasOpen = dep.classList.contains('open');
+      drawer.querySelectorAll('.dep.open').forEach(function(d){ d.classList.remove('open'); });
+      if (!wasOpen) dep.classList.add('open');
+    });
+  });
+  // Accordéon personnages (multi-vues)
+  drawer.querySelectorAll('.perso-h').forEach(function(h){
+    h.addEventListener('click', function(){ h.parentElement.classList.toggle('open'); });
+  });
+
+  // Clic sur une vue : maj avatar/nom + fermeture (HTMX charge #vue tout seul)
+  drawer.querySelectorAll('.vuelink').forEach(function(b){
+    b.addEventListener('click', function(){
+      var av = b.getAttribute('data-av'), nom = b.getAttribute('data-nom');
+      if (av) document.getElementById('agentav').src = '/static/avatars/' + av;
+      if (nom) document.getElementById('agentnom').textContent = nom;
+      closeDrawer();
+    });
   });
 </script>
 </body>

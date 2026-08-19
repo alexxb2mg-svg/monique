@@ -181,3 +181,68 @@ form.parler input{flex:1;font-family:inherit;font-size:13px;border:1.5px solid v
 .badge-rejete{background:#4a2b2b;color:#e6b0b0}
 .badge-bloque{background:#4a422b;color:#e6d7a0}
 .badge-en_cours{background:#2b3a4a;color:#a8cbe6}
+
+/* ===== Refonte nav D-4 : bouton menu + panneau departements slide-in ===== */
+.topleft{display:flex;align-items:center;gap:14px}
+.menubtn{width:42px;height:42px;border:1.5px solid var(--regle);background:var(--papier);border-radius:11px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none}
+.menubtn:hover{border-color:var(--secu)}
+.menubtn .bars{display:inline-flex;flex-direction:column;gap:4px}
+.menubtn .bars span{width:18px;height:2.4px;background:var(--encre);border-radius:2px;display:block}
+
+.drawer{position:fixed;inset:0;z-index:60}
+.drawer[hidden]{display:none}
+.scrim{position:absolute;inset:0;background:rgba(20,18,16,.34);opacity:0;transition:opacity .26s ease}
+.drawer.open .scrim{opacity:1}
+.panel{position:absolute;top:0;left:0;height:100%;width:min(340px,86vw);background:var(--papier);
+  border-right:1px solid var(--regle);box-shadow:2px 0 26px rgba(20,18,16,.18);
+  transform:translateX(-100%);transition:transform .26s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.drawer.open .panel{transform:none}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 12px;
+  font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--grisdoux)}
+.panel-x{border:none;background:none;font-size:24px;line-height:1;color:var(--grisdoux);cursor:pointer}
+.panel-x:hover{color:var(--encre)}
+.arbo{overflow-y:auto;padding:4px 10px 22px}
+
+.dep-h{width:100%;display:flex;align-items:center;gap:11px;padding:11px 10px;background:none;border:none;
+  cursor:pointer;font-family:inherit;font-size:15px;font-weight:700;color:var(--encre);text-align:left;border-radius:9px}
+.dep-h:hover{background:var(--fond)}
+.pastille{width:12px;height:12px;border-radius:50%;flex:none}
+.dep-nom{flex:1}
+.chev{color:var(--grisdoux);font-size:18px;transition:transform .2s ease}
+.dep.open>.dep-h .chev{transform:rotate(90deg)}
+.dep-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .26s ease}
+.dep.open>.dep-body{grid-template-rows:1fr}
+.dep-inner{overflow:hidden;padding-left:8px}
+
+.perso{margin:1px 0}
+.perso-h,.perso.solo{width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;background:none;border:none;
+  cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;color:var(--encre);text-align:left;border-radius:9px}
+.perso-h:hover,.perso.solo:hover{background:var(--fond)}
+.perso-h span:not(.chev),.perso.solo span{flex:1}
+.av{width:30px;height:30px;border-radius:50%;object-fit:cover;image-rendering:pixelated;border:1px solid var(--regle);flex:none}
+.perso .chev{font-size:15px}
+.perso.open>.perso-h .chev{transform:rotate(90deg)}
+.perso-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}
+.perso.open>.perso-body{grid-template-rows:1fr}
+.perso-inner{overflow:hidden;padding-left:40px}
+.vuelink{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:600;color:var(--grisdoux);padding:7px 10px;border-radius:8px}
+.vuelink:hover{background:var(--fond);color:var(--encre)}
+
+/* ===== Accueil cockpit (D-4) : cartes cliquables + pouls brigade ===== */
+button.cb{font-family:inherit;text-align:left;width:100%;cursor:pointer;transition:transform .12s ease,border-color .12s ease}
+button.cb:hover{border-color:var(--secu);transform:translateY(-1px)}
+button.cb:active{transform:translateY(0)}
+.pouls-tete{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sys{font-size:12px;color:var(--grisdoux);font-weight:600}
+.sys .warn{color:var(--alerte);font-weight:800}
+.poulschips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px}
+.chip{font-size:12px;font-weight:700;padding:4px 11px;border-radius:20px;background:var(--fond);
+  border:1px solid var(--regle);color:var(--grisdoux)}
+.chip.ok{color:var(--vert);border-color:rgba(31,138,76,.32)}
+.chip.gris{opacity:.85}
+.poulsgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px;margin-top:12px}
+@media(max-width:640px){.poulsgrid{grid-template-columns:1fr}}
+.pouls-item{font-size:13px;color:var(--encre);padding:6px 0;border-bottom:1px solid var(--regle);line-height:1.35;
+  display:flex;gap:8px;align-items:baseline}

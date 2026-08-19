@@ -2,16 +2,48 @@
 <div class="rupture"></div>
 <p class="besoin-titre">Ce qui a besoin de toi maintenant</p>
 <div class="cartesbrief">
-  <div class="cb">
+  <button class="cb" type="button" hx-get="/vue/boite" hx-target="#vue">
     <div class="cbt">{{ brief.mails_a_traiter }} message(s) à traiter</div>
     <div class="cbd">Brouillons préparés dans « La boîte ».</div>
-  </div>
-  <div class="cb">
+  </button>
+  <button class="cb" type="button" hx-get="/vue/relances" hx-target="#vue">
     <div class="cbt">{{ brief.relances }} relance(s)</div>
-    <div class="cbd">Devis sans réponse et factures impayées — onglet Relances.</div>
-  </div>
-  <div class="cb">
+    <div class="cbd">Devis sans réponse et factures impayées.</div>
+  </button>
+  <button class="cb" type="button" hx-get="/vue/faire" hx-target="#vue">
     <div class="cbt">{{ brief.taches_retard }} tâche(s) en retard</div>
     <div class="cbd">À rattraper — onglet À faire.</div>
+  </button>
+</div>
+
+{% if brief.chantier and brief.chantier.disponible %}
+<div class="rupture"></div>
+<div class="pouls-tete">
+  <p class="besoin-titre" style="margin:0">Le chantier de Beecham</p>
+  <span class="sys">Système : {{ brief.systeme.vivants }} process actif{{ 's' if brief.systeme.vivants > 1 else '' }}{% if brief.systeme.orphelins %} · <span class="warn">⚠ {{ brief.systeme.orphelins }} orphelin(s)</span>{% endif %}</span>
+</div>
+<div class="poulschips">
+  <span class="chip">{{ brief.chantier.compte.en_cours }} en cours</span>
+  <span class="chip ok">{{ brief.chantier.compte.fusionnes }} fusionnés</span>
+  <span class="chip gris">{{ brief.chantier.compte.rates }} rejetés / échecs</span>
+</div>
+
+<div class="poulsgrid">
+  <div>
+    <p class="sous">Sujets en cours</p>
+    {% for s in brief.chantier.en_cours[:5] %}
+    <div class="pouls-item"><span class="badge">en cours</span> {{ s.sujet }}</div>
+    {% else %}
+    <p class="vide">Rien en cours.</p>
+    {% endfor %}
+  </div>
+  <div>
+    <p class="sous">Derniers fusionnés</p>
+    {% for s in brief.chantier.fusionnes[:5] %}
+    <div class="pouls-item"><span class="badge badge-valide">fusionné</span> {{ s.sujet }}</div>
+    {% else %}
+    <p class="vide">Rien encore.</p>
+    {% endfor %}
   </div>
 </div>
+{% endif %}
