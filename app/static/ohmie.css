@@ -251,5 +251,15 @@ button.cb:active{transform:translateY(0)}
 .marque{display:flex;align-items:center;gap:9px}
 .logo-av{width:34px;height:34px;border-radius:50%;object-fit:cover;object-position:center 22%;
   image-rendering:pixelated;border:1.5px solid var(--regle);flex:none}
-.wordmark{font-weight:800;font-size:23px;letter-spacing:-0.02em;line-height:1}
+.wordmark{display:none}  /* le visage de Monique EST le logo — le nom textuel est retiré (Alex 20:42) */
 .marque .date{margin-left:2px}
+
+/* En-tête responsive : sur mobile, ne jamais pousser la carte agent hors de l'écran. */
+@media(max-width:560px){
+  header.top{gap:8px}
+  .marque .date{display:none}
+  .logo-av{width:30px;height:30px}
+  .moniquecard{gap:7px;padding:4px 9px 4px 4px}
+  .moniquecard .mavatar{width:48px;height:48px;border-radius:10px}
+  .menubtn{width:38px;height:38px}
+}
