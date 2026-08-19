@@ -38,6 +38,7 @@ import roles
 import secretaire_actions
 import store
 import superviseur
+import vue_missions
 import vue_usage
 
 BASE = Path(__file__).parent
@@ -270,6 +271,17 @@ def _fournisseurs_materiel_ctx():
 def vue_fournisseurs_materiel(request: Request):
     return tpl.TemplateResponse(
         request, "vue_fournisseurs_materiel.html", _fournisseurs_materiel_ctx()
+    )
+
+
+def _missions_actives_ctx():
+    return {"missions": vue_missions.contexte_missions_actives()}
+
+
+@app.get("/vue/missions-actives", response_class=HTMLResponse)
+def vue_missions_actives_route(request: Request):
+    return tpl.TemplateResponse(
+        request, "vue_missions_actives.html", _missions_actives_ctx()
     )
 
 
