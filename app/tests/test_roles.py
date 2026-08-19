@@ -102,3 +102,24 @@ def test_documentaliste_visible_dans_annuaire_et_departement_recherche():
     assert "documentaliste" in carte
     assert roles.parse_role("documentaliste")["departement"] == "Recherche"
     assert "documentaliste" in roles.carte_departements()["Recherche"]
+
+
+import re
+
+import beecham
+
+
+def test_roles_dict_correspond_aux_role_md_reels():
+    # D-11 : beecham.ROLES (system prompt réellement injecté à l'exécution, cf. _lancer_agent)
+    # et agents/<nom>/ROLE.md (utilisé par roles.charger/cerveau.py) doivent porter le MÊME
+    # texte, sinon la fiche qu'on lit et ce qui tourne réellement divergent silencieusement
+    # (c'était le cas pour chercheur avant cette mission). Comparaison sur texte normalisé
+    # (espaces/retours à la ligne collapsés) : beecham.py concatène des littéraux Python sans
+    # retour à la ligne, agents/*/ROLE.md porte des retours à la ligne durs — le CONTENU doit
+    # rester identique, pas la mise en page.
+    for nom in roles.carte_agents():
+        if nom not in beecham.ROLES:
+            continue  # ex. secretaire : agent d'un autre système (cerveau.py), pas beecham.py
+        attendu = re.sub(r"\s+", " ", beecham.ROLES[nom]).strip()
+        reel = re.sub(r"\s+", " ", roles.charger(nom)).strip()
+        assert reel == attendu, f"{nom} : agents/{nom}/ROLE.md diverge de beecham.ROLES[{nom!r}]"
