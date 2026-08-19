@@ -170,9 +170,16 @@ ROLES = {
     "controleur": "Tu es le contrôleur qualité. Tu relis le code de façon adversariale et tu "
     "signales les défauts, sans complaisance.",
 }
-_OUTILS_AGENT = (
-    "Read,Edit,Write,Glob,Grep"  # JAMAIS Bash : le harnais lance les tests, pas l'agent
-)
+# Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
+# borne les Write/Edit aux zones autorisées quoi qu'il arrive.
+_OUTILS = {
+    # le dev édite le code
+    "developpeur": "Read,Edit,Write,Glob,Grep",
+    # le chercheur LIT large (dont le web, pour aller apprendre dehors) et écrit ses notes
+    "chercheur": "Read,Glob,Grep,Write,WebSearch,WebFetch",
+    # le contrôleur relit, ne modifie rien
+    "controleur": "Read,Glob,Grep",
+}
 
 
 def _git(cwd, *args, timeout=120):
@@ -260,12 +267,17 @@ def _lancer_agent(role, consigne, worktree) -> dict:
     """Session codeur SCOPÉE : Read/Edit/Write only (pas de Bash), cwd=worktree, aucun MCP.
     Renvoie {ok, journal:[actions], texte}. Mockable en test."""
     systeme = ROLES.get(role, ROLES["developpeur"])
+    outils = _OUTILS.get(role, _OUTILS["developpeur"])
     prompt = (
         f"{consigne}\n\n"
         "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
         "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
         "seront lancés automatiquement après toi. Réponds par un court résumé de ce que tu as fait."
     )
+    # Anti-octet-nul : Windows CreateProcess refuse tout argument contenant \x00 (ValueError).
+    # Un chemin ou une consigne mal échappé (ex. « \00 ») en glisserait un — on nettoie par sécurité.
+    prompt = prompt.replace("\x00", "")
+    systeme = systeme.replace("\x00", "")
     settings = (
         _ecrire_garde()
     )  # garde-fou d'écriture (hors dépôt) : refuse tout hors zones
@@ -285,7 +297,7 @@ def _lancer_agent(role, consigne, worktree) -> dict:
         "--permission-mode",
         "acceptEdits",
         "--allowedTools",
-        _OUTILS_AGENT,
+        outils,
         "--strict-mcp-config",
         "--settings",
         str(settings),
