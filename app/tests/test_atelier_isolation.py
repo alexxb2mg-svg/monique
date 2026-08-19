@@ -31,19 +31,29 @@ def test_lancer_agent_lit_plan_via_atelier_seul(tmp_path, monkeypatch):
     atelier.mkdir(parents=True)
     (atelier / "plan.md").write_text("PLAN-ISOLE : contenu de test\n", encoding="utf-8")
 
+    import superviseur
+
+    monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
+    monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
+
     appels = []
 
-    def faux_run(cmd, **kwargs):
+    def faux_popen(cmd, **kwargs):
         appels.append(cmd)
 
         class FauxProc:
+            pid = 424242
             returncode = 0
-            stdout = ""
-            stderr = ""
+
+            def communicate(self, timeout=None):
+                return ("", "")
+
+            def kill(self):
+                pass
 
         return FauxProc()
 
-    monkeypatch.setattr(beecham.subprocess, "run", faux_run)
+    monkeypatch.setattr(beecham.subprocess, "Popen", faux_popen)
 
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 
