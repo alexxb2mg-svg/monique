@@ -65,6 +65,7 @@ def test_traitement_auto_rejete_abandonne(tmp_path, monkeypatch):
     monkeypatch.setattr(beecham, "RACINE", repo)
     monkeypatch.setattr(beecham, "WORKTREES", tmp_path / "wt")
     monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    monkeypatch.setattr(beecham, "MEMOIRE", tmp_path / "atelier" / "memoire")
     db = str(tmp_path / "shadow.db")
     entrepot.init_fondations(db)
     mid = beecham.demarrer_mission("changement à jeter", db)
@@ -81,6 +82,35 @@ def test_traitement_auto_rejete_abandonne(tmp_path, monkeypatch):
     assert r["statut"] == "rejete"
     assert not (repo / "app" / "jetable.py").exists()
     assert beecham.lire_mission(mid, db)["statut"] == "rejete"
+
+
+def test_rejet_grave_la_lecon_dans_memoire_developpeur(tmp_path, monkeypatch):
+    """Un rejet DÉFINITIF du contrôleur laisse une trace datée dans memoire/developpeur.md
+    (consigne + raison) — pour que la même approche mauvaise ne revienne pas à zéro."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(beecham, "RACINE", repo)
+    monkeypatch.setattr(beecham, "WORKTREES", tmp_path / "wt")
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    monkeypatch.setattr(beecham, "MEMOIRE", tmp_path / "atelier" / "memoire")
+    db = str(tmp_path / "shadow.db")
+    entrepot.init_fondations(db)
+    mid = beecham.demarrer_mission("changement à jeter", db)
+
+    def controleur_rejette(scope, diff, tests_resume, worktree):
+        return {"verdict": "rejeter", "raison": "approche mauvaise, à éviter"}
+
+    r = beecham.executer_mission(
+        mid,
+        chemin=db,
+        _agent=_agent_ecrit("jetable.py", "X = 1\n"),
+        _controleur=controleur_rejette,
+    )
+    assert r["statut"] == "rejete"
+
+    contenu = beecham.chemin_memoire("developpeur").read_text(encoding="utf-8")
+    assert "rejet" in contenu
+    assert "changement à jeter" in contenu
+    assert "approche mauvaise, à éviter" in contenu
 
 
 def test_mission_atelier_auto_livree(tmp_path, monkeypatch):

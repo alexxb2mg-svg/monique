@@ -97,6 +97,18 @@ def chemin_memoire(role) -> Path:
     return fichier
 
 
+def _graver_lecon_rejet(consigne, raison) -> None:
+    """Grave la leçon d'un rejet DÉFINITIF du contrôleur dans la mémoire du développeur
+    (atelier/memoire/developpeur.md) — seul verdict où l'approche est jugée mauvaise et
+    vaut la peine d'être évitée la prochaine fois. Fail-soft : une erreur d'écriture ne
+    doit jamais faire échouer la mission, même principe que `journal_ajouter`."""
+    try:
+        with open(chemin_memoire("developpeur"), "a", encoding="utf-8") as f:
+            f.write(f"- {_now()} · rejet : {consigne[:80]} · raison : {raison[:200]}\n")
+    except OSError:
+        pass
+
+
 def zone_ecriture_autorisee(chemin: str, zones: list[str]) -> bool:
     """LE garde-fou (logique) : une écriture n'est permise que SOUS l'une des zones autorisées
     (worktree de la mission + atelier). Tout le reste — dossiers de production inclus — est REFUSÉ.
@@ -618,6 +630,7 @@ def executer_mission(
                 "accepté + fusionné (local)" if ok else "conflit de fusion",
             )
         if verdict == "rejeter":
+            _graver_lecon_rejet(m["consigne"], raison)
             _nettoyer(m["branche"], wt)
             return _clore(
                 mission_id,
