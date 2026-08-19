@@ -93,3 +93,12 @@ def test_fournisseurs_materiel_visible_dans_annuaire_et_departement_approvisionn
     assert "fournisseurs_materiel" in carte
     assert roles.parse_role("fournisseurs_materiel")["departement"] == "Approvisionnement"
     assert "fournisseurs_materiel" in roles.carte_departements()["Approvisionnement"]
+
+
+def test_documentaliste_visible_dans_annuaire_et_departement_recherche():
+    # D-2 (scaffold) : agents/documentaliste/ROLE.md existe dans le VRAI dossier agents/ du
+    # dépôt (pas de tmp_path/monkeypatch ici, comme carte_agents() en production).
+    carte = roles.carte_agents()
+    assert "documentaliste" in carte
+    assert roles.parse_role("documentaliste")["departement"] == "Recherche"
+    assert "documentaliste" in roles.carte_departements()["Recherche"]
