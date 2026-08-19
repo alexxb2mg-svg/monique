@@ -26,6 +26,7 @@ import brief
 import config
 import digest as digest_module
 import entrepot
+import executions
 import fournisseurs
 import fournisseurs_materiel
 import monitoring
@@ -89,6 +90,14 @@ async def lifespan(app):
             proprietaire="monique",
             but="serveur FastAPI :8790",
         )
+    except Exception:
+        pass
+    # Registre MISSIONS Beecham (secw_executions) : distinct du registre PROCESSUS
+    # (secw_processus) réconcilié juste au-dessus — au boot on marque 'unknown' les
+    # missions restées claimed/running dont le process est prouvé mort (crash serveur
+    # en cours de mission). Fail-soft : jamais bloquer le démarrage pour ça.
+    try:
+        executions.reprendre_interrompues()
     except Exception:
         pass
     # D-16, trou B : réconciliation périodique pendant que le serveur tourne (pas
