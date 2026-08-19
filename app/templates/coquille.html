@@ -42,68 +42,31 @@
       <button class="panel-x" data-close aria-label="Fermer">×</button>
     </div>
     <div class="arbo">
-      {% set arbre = [
-        ("Direction", "#7a4f86", [
-          ("Beecham", "orchestrateur.jpg", [("Beecham", "/vue/beecham")]),
-        ]),
-        ("Secrétariat", "#c56a3a", [
-          ("Secrétaire", "secretaire.png", [("Aujourd'hui", "/vue/jour"), ("La boîte", "/vue/boite")]),
-          ("Maître d'œuvre", "maitre_oeuvre.jpg", [("À faire", "/vue/faire")]),
-        ]),
-        ("Comptabilité", "#1f8a4c", [
-          ("Comptable", "comptable.jpg", [("Relances", "/vue/relances")]),
-        ]),
-        ("Informatique", "#3f6d8a", [
-          ("Développeur", "developpeur.jpg", [("Réglages", "/vue/reglages")]),
-          ("Documentaliste", "documentaliste.jpg", [("Fournisseurs modèles IA", "/vue/fournisseurs")]),
-        ]),
-        ("Approvisionnement", "#d2691e", [
-          ("Approvisionnement", "fournisseurs_materiel.jpg", [("Fournisseurs matériel", "/vue/fournisseurs-materiel")]),
-        ]),
-        ("Pilotage", "#b3803a", [
-          ("Technicien", "technicien.jpg", [("Planificateur", "/vue/planif")]),
-        ]),
-        ("Infra & Surveillance Système", "#557089", [
-          ("Veilleur", "veilleur.jpg", [("Monitoring", "/vue/monitoring"), ("Système", "/vue/processus"), ("Coût", "/vue/usage"), ("Missions actives", "/vue/missions-actives")]),
-        ]),
-        ("Recherche / Veille", "#2c8a8a", [
-          ("Chercheur", "chercheur.jpg", [("Recherche", "/vue/recherche")]),
-        ]),
-        ("Qualité", "#8a3f6e", [
-          ("Vision", "vision.jpg", [("Qualité", "/vue/qualite")]),
-        ]),
-        ("Interface", "#7a8a3f", [
-          ("Vitrine", "vitrine.jpg", [("Interface", "/vue/interface")]),
-        ]),
-        ("La brigade", "#9a5b3f", [
-          ("La brigade", "orchestrateur.jpg", [("Agents", "/vue/agents")]),
-        ]),
-      ] %}
-      {% for dep, coul, persos in arbre %}
+      {% for dep in departements %}
       <div class="dep">
         <button class="dep-h" type="button">
-          <span class="pastille" style="background:{{ coul }}"></span>
-          <span class="dep-nom">{{ dep }}</span>
+          <span class="pastille" style="background:{{ dep.couleur }}"></span>
+          <span class="dep-nom">{{ dep.nom }}</span>
           <span class="chev">›</span>
         </button>
         <div class="dep-body"><div class="dep-inner">
-          {% for perso, av, vues in persos %}
-          {% if vues|length == 1 %}
+          {% for p in dep.personas %}
+          {% if p.onglets|length == 1 %}
             <button class="perso solo vuelink" type="button"
-                    hx-get="{{ vues[0][1] }}" hx-target="#vue"
-                    data-av="{{ av }}" data-nom="{{ perso }}">
-              <img class="av" src="/static/avatars/{{ av }}" alt=""><span>{{ perso }}</span>
+                    hx-get="{{ p.onglets[0].route }}" hx-target="#vue"
+                    data-av="{{ p.avatar }}" data-nom="{{ p.nom }}">
+              <img class="av" src="/static/avatars/{{ p.avatar }}" alt=""><span>{{ p.nom }}</span>
             </button>
           {% else %}
             <div class="perso">
               <button class="perso-h" type="button">
-                <img class="av" src="/static/avatars/{{ av }}" alt=""><span>{{ perso }}</span>
+                <img class="av" src="/static/avatars/{{ p.avatar }}" alt=""><span>{{ p.nom }}</span>
                 <span class="chev">›</span>
               </button>
               <div class="perso-body"><div class="perso-inner">
-                {% for label, url in vues %}
-                <button class="vuelink" type="button" hx-get="{{ url }}" hx-target="#vue"
-                        data-av="{{ av }}" data-nom="{{ perso }}">{{ label }}</button>
+                {% for o in p.onglets %}
+                <button class="vuelink" type="button" hx-get="{{ o.route }}" hx-target="#vue"
+                        data-av="{{ p.avatar }}" data-nom="{{ p.nom }}">{{ o.label }}</button>
                 {% endfor %}
               </div></div>
             </div>
