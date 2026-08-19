@@ -20,7 +20,7 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:14p
 .moniquecard{display:flex;align-items:center;gap:9px;background:var(--papier);
   border:1.5px solid var(--regle);border-radius:12px;padding:5px 12px 5px 5px}
 /* D-4 (2026-08-19) : agrandi sur demande Alex — vérification visuelle en attente, l'agent vision (Qualité) n'a pas encore d'outillage de capture opérationnel */
-.moniquecard .mavatar{width:78px;height:78px;border-radius:13px;object-fit:cover;
+.moniquecard .mavatar{width:110px;height:110px;border-radius:18px;object-fit:cover;
   object-position:center 30%;image-rendering:pixelated;border:1px solid var(--regle);flex:none}
 .agentmeta{display:flex;flex-direction:column;gap:1px}
 .agentnom{font-weight:800;font-size:13px;line-height:1.1}
@@ -144,7 +144,7 @@ form.parler input{flex:1;font-family:inherit;font-size:13px;border:1.5px solid v
 .agent{display:flex;gap:13px;align-items:flex-start;background:var(--papier);
   border:1.5px solid var(--regle);border-radius:13px;padding:14px 15px}
 /* D-4 (2026-08-19) : agrandi sur demande Alex — vérification visuelle en attente, l'agent vision (Qualité) n'a pas encore d'outillage de capture opérationnel */
-.agent .avatar{width:132px;height:132px;border-radius:10px;object-fit:cover;flex:none;
+.agent .avatar{width:170px;height:170px;border-radius:14px;object-fit:cover;flex:none;
   border:1.5px solid var(--regle);image-rendering:pixelated}
 .agent .vide-av{background:var(--fond)}
 .ag-nom{font-weight:800;font-size:15px;text-transform:capitalize}
@@ -260,6 +260,6 @@ button.cb:active{transform:translateY(0)}
   .marque .date{display:none}
   .logo-av{width:30px;height:30px}
   .moniquecard{gap:7px;padding:4px 9px 4px 4px}
-  .moniquecard .mavatar{width:48px;height:48px;border-radius:10px}
+  .moniquecard .mavatar{width:64px;height:64px;border-radius:12px}
   .menubtn{width:38px;height:38px}
 }
