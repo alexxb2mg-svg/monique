@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 from entrepot import connexion_ecriture
+import executions
 
 LOG = logging.getLogger(__name__)
 
@@ -744,15 +745,18 @@ def executer_mission(
     m = lire_mission(mission_id, chemin)
     if not m:
         return {"ok": False, "erreur": "mission_absente"}
+    executions.creer(mission_id, role, chemin)
     agent = _agent or _lancer_agent
     controle = _controleur or _lancer_controleur
     try:
         wt = _creer_worktree(m["branche"])
     except Exception as e:
         _maj(mission_id, chemin, statut="echec", journal=json.dumps([str(e)]))
+        executions.finir(mission_id, "failed", str(e), None, chemin)
         return {"ok": False, "erreur": str(e)}
 
     journal, consigne, session_id = [], m["consigne"], None
+    executions.marquer_en_cours(mission_id, chemin)
     for tour in range(1, max_tours + 1):
         # tour > 1 : on REPREND la session du dev (--resume) — il garde sa mémoire de travail du
         # tour précédent, on ne réinjecte pas tout le contexte à froid (moins d'overhead + cache gardé).
@@ -764,15 +768,9 @@ def executer_mission(
 
         if not h["diff"].strip():  # mission atelier : rien à fusionner
             _nettoyer(m["branche"], wt)
-            return _clore(
-                mission_id,
-                chemin,
-                "livre",
-                role,
-                journal,
-                h,
-                "livré (rien à fusionner)",
-            )
+            resume = "livré (rien à fusionner)"
+            executions.finir(mission_id, "completed", resume, None, chemin)
+            return _clore(mission_id, chemin, "livre", role, journal, h, resume)
 
         if not h["tests_ok"]:
             verdict, raison = "corriger", f"tests en échec : {h['tests_resume']}"
@@ -783,6 +781,14 @@ def executer_mission(
 
         if verdict == "accepte":
             ok = _fusion_locale(m["branche"], wt, mission_id)
+            resume = "accepté + fusionné (local)" if ok else "conflit de fusion"
+            executions.finir(
+                mission_id,
+                "completed" if ok else "failed",
+                resume,
+                "delivered" if ok else None,
+                chemin,
+            )
             return _clore(
                 mission_id,
                 chemin,
@@ -790,20 +796,14 @@ def executer_mission(
                 role,
                 journal,
                 h,
-                "accepté + fusionné (local)" if ok else "conflit de fusion",
+                resume,
             )
         if verdict == "rejeter":
             _graver_lecon_rejet(m["consigne"], raison)
             _nettoyer(m["branche"], wt)
-            return _clore(
-                mission_id,
-                chemin,
-                "rejete",
-                role,
-                journal,
-                h,
-                "rejeté (abandon) : " + raison[:80],
-            )
+            resume = "rejeté (abandon) : " + raison[:80]
+            executions.finir(mission_id, "failed", raison[:200], None, chemin)
+            return _clore(mission_id, chemin, "rejete", role, journal, h, resume)
         # « corriger » : on renvoie au dev avec la correction, sans repartir de zéro
         if tour < max_tours:
             correction = (
@@ -835,6 +835,7 @@ def executer_mission(
                 ),
             )
             journal_ajouter(role, m["consigne"][:50], "bloqué (à revoir par Alex)")
+            executions.finir(mission_id, "failed", raison[:200], None, chemin)
             return {
                 "ok": False,
                 "statut": "bloque",
