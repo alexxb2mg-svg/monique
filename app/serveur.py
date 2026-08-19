@@ -285,6 +285,24 @@ def vue_missions_actives_route(request: Request):
     )
 
 
+def _qualite_ctx():
+    return {}
+
+
+@app.get("/vue/qualite", response_class=HTMLResponse)
+def vue_qualite_route(request: Request):
+    return tpl.TemplateResponse(request, "vue_qualite.html", _qualite_ctx())
+
+
+def _interface_ctx():
+    return {}
+
+
+@app.get("/vue/interface", response_class=HTMLResponse)
+def vue_interface_route(request: Request):
+    return tpl.TemplateResponse(request, "vue_interface.html", _interface_ctx())
+
+
 def _recherche_ctx():
     notes = sorted(
         (n for n in beecham.lister_atelier() if n["chemin"].startswith("connaissances/")),
