@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 import beecham
@@ -62,3 +64,15 @@ def test_mesurer_routes(monkeypatch):
     assert plus_lente < 5.0  # garde-fou large, pas une contrainte de perf serrée
 
     print(formater_tableau(mesures))
+
+    # `pytest -q` (mode du harnais automatique) n'affiche pas le stdout d'un test qui
+    # PASSE : le tableau ci-dessus serait donc perdu à chaque run. On l'écrit en plus
+    # dans un fichier suivi par git pour qu'il devienne lisible dans le diff/l'historique
+    # de la mission. Limite honnête de cette mesure : ce TestClient FastAPI tourne
+    # IN-PROCESS, donc il ne reproduit ni la contention SQLite réelle (missions qui
+    # écrivent le store pendant qu'un GET le lit, busy_timeout 8s) ni le réseau réel —
+    # un résultat rapide ici ne prouve donc PAS que l'expérience réelle d'Alex l'est
+    # aussi [NON VÉRIFIÉ pour la contention réelle].
+    (Path(__file__).parent / "_dernieres_mesures_latence.txt").write_text(
+        formater_tableau(mesures), encoding="utf-8"
+    )
