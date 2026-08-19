@@ -147,6 +147,7 @@ DEPARTEMENTS: list[Departement] = [
                     {"route": "/vue/monitoring", "label": "Monitoring"},
                     {"route": "/vue/processus", "label": "Système"},
                     {"route": "/vue/usage", "label": "Coût"},
+                    {"route": "/vue/missions-actives", "label": "Missions actives"},
                 ],
             },
         ],
@@ -161,6 +162,34 @@ DEPARTEMENTS: list[Departement] = [
                 "avatar": "chercheur.jpg",
                 "onglets": [
                     {"route": "/vue/recherche", "label": "Recherche"},
+                ],
+            },
+        ],
+    },
+    {
+        "slug": "qualite",
+        "nom": "Qualité",
+        "couleur": "#8a3f6e",
+        "personas": [
+            {
+                "nom": "Vision",
+                "avatar": "vision.jpg",
+                "onglets": [
+                    {"route": "/vue/qualite", "label": "Qualité"},
+                ],
+            },
+        ],
+    },
+    {
+        "slug": "interface",
+        "nom": "Interface",
+        "couleur": "#7a8a3f",
+        "personas": [
+            {
+                "nom": "Vitrine",
+                "avatar": "vitrine.jpg",
+                "onglets": [
+                    {"route": "/vue/interface", "label": "Interface"},
                 ],
             },
         ],
