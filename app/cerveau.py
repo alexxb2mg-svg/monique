@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import re
 import subprocess
 import threading
@@ -83,7 +84,13 @@ def spillover(texte: str, seuil: int = 8000) -> str:
     return f"{propre[:seuil]}\n[…tronqué… voir coffre spillover/{h}.txt ({len(texte)} car.)]"
 
 
-def _lancer_claude_cli(prompt: str, system: str | None, prof: ProviderProfile) -> dict:
+def _lancer_claude_cli(
+    prompt: str,
+    system: str | None,
+    prof: ProviderProfile,
+    agent: str | None = None,
+    task: str | None = None,
+) -> dict:
     # CONFINEMENT (revue B1) : le cerveau ne produit QUE du texte.
     #  - --strict-mcp-config SANS --mcp-config => AUCUN serveur MCP chargé
     #    (donc pas de dolibarr-ops / gmail / telegram / whatsapp / db-ops : zéro envoi/écriture externe)
@@ -118,37 +125,70 @@ def _lancer_claude_cli(prompt: str, system: str | None, prof: ProviderProfile) -
         bufsize=1,
         creationflags=CREATE_NO_WINDOW,
     )
-    lignes = []
-    lecteur = threading.Thread(target=lambda: lignes.extend(proc.stdout), daemon=True)
-    lecteur.start()
-    lecteur.join(
-        timeout=1800
-    )  # revue §13.5 : deadline murale sur la LECTURE (pas juste sur wait)
-    if lecteur.is_alive():  # stdout ne se ferme jamais => claude figé
-        proc.kill()
-        lecteur.join(timeout=5)  # drain borné après kill
-        raise RuntimeError("claude -p figé (timeout de lecture)")
+    # inscrit la session claude au superviseur (D-16) : elle apparaît au tableau des
+    # process, et en cas de timeout on coupe TOUT son sous-arbre (même patron que
+    # app/beecham.py:482-533).
+    import superviseur
+
+    rid_sup = None
     try:
-        code = proc.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        # revue résilience : pas d'orphelin claude
-        proc.kill()
-        proc.wait(timeout=5)
-        code = -1
-    texte, it, ot, err = "", 0, 0, ""
-    for ligne in lignes:
+        rid_sup = superviseur.enregistrer(
+            proc.pid,
+            nom=f"cerveau:{agent or prof.nom}",
+            proprietaire=agent or prof.nom,
+            but=(task or "")[:70],
+            ppid=os.getpid(),
+        )
+    except Exception:
+        pass
+    try:
+        lignes = []
+        lecteur = threading.Thread(
+            target=lambda: lignes.extend(proc.stdout), daemon=True
+        )
+        lecteur.start()
+        lecteur.join(
+            timeout=1800
+        )  # revue §13.5 : deadline murale sur la LECTURE (pas juste sur wait)
+        if lecteur.is_alive():  # stdout ne se ferme jamais => claude figé
+            if rid_sup:
+                try:
+                    superviseur.tuer(rid_sup)  # coupe l'arbre claude entier
+                except Exception:
+                    proc.kill()
+            else:
+                proc.kill()
+            lecteur.join(timeout=5)  # drain borné après kill
+            raise RuntimeError("claude -p figé (timeout de lecture)")
         try:
-            ev = json.loads(ligne)
-        except Exception:
-            err += ligne  # lignes non-JSON (stderr) accumulées pour le diagnostic
-            continue
-        if ev.get("type") == "result":
-            texte = ev.get("result") or ""
-            u = ev.get("usage") or {}
-            it, ot = u.get("input_tokens", 0), u.get("output_tokens", 0)
-    if code != 0 or not texte:  # revue M6 : échec réel, pas un "succès vide"
-        raise RuntimeError((err[-500:] or f"claude -p code={code} sans result").strip())
-    return {"texte": texte, "input_tokens": it, "output_tokens": ot}
+            code = proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            # revue résilience : pas d'orphelin claude
+            proc.kill()
+            proc.wait(timeout=5)
+            code = -1
+        texte, it, ot, err = "", 0, 0, ""
+        for ligne in lignes:
+            try:
+                ev = json.loads(ligne)
+            except Exception:
+                err += ligne  # lignes non-JSON (stderr) accumulées pour le diagnostic
+                continue
+            if ev.get("type") == "result":
+                texte = ev.get("result") or ""
+                u = ev.get("usage") or {}
+                it, ot = u.get("input_tokens", 0), u.get("output_tokens", 0)
+        if code != 0 or not texte:  # revue M6 : échec réel, pas un "succès vide"
+            raise RuntimeError(
+                (err[-500:] or f"claude -p code={code} sans result").strip()
+            )
+        return {"texte": texte, "input_tokens": it, "output_tokens": ot}
+    finally:
+        if rid_sup:
+            try:
+                superviseur.finir(rid_sup)
+            except Exception:
+                pass
 
 
 def _lancer_openai_compat(prompt: str, system: str | None, prof: ProviderProfile) -> dict:
@@ -196,7 +236,7 @@ def appeler(
     prompt = spillover(prompt)
     try:
         if profile.mode == "claude_cli":
-            res = _lancer_claude_cli(prompt, system, profile)
+            res = _lancer_claude_cli(prompt, system, profile, agent=agent, task=task)
         elif profile.mode == "openai_compat":
             oc = _lancer_openai_compat(prompt, system, profile)
             if not oc["ok"]:
