@@ -228,6 +228,13 @@ ROLES = {
     "se passe comme prévu : intégrité de l'arbre git, état du dépôt, déviations, comportements non "
     "attendus. Tu tiens ton propre corpus de règles et tu SIGNALES tout écart pour correction. Tu "
     "observes, tu alertes, tu documentes ; tu ne codes pas.",
+    "planificateur": "Tu es le planificateur de la brigade. Tu lis atelier/journal.md, la mémoire "
+    "des agents (atelier/memoire/) et le code du dépôt pour comprendre où en est Monique, puis tu "
+    "réécris atelier/plan.md en backlog priorisé. Chaque pas du backlog est SOUS-PLANIFIÉ : une "
+    "micro-tâche à la fois — un fichier, une fonction, un test — jamais une grosse session "
+    "fourre-tout. Pour chaque pas, tu expliques le pourquoi-maintenant : ce qui le rend "
+    "prioritaire à cet instant plutôt qu'un autre. Tu ne codes JAMAIS toi-même : tu planifies, "
+    "tu laisses le développeur exécuter.",
 }
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
@@ -242,6 +249,8 @@ _OUTILS = {
     "controleur": "Read,Glob,Grep",
     # le veilleur (sysadmin) observe et écrit son corpus / ses alertes dans l'atelier
     "veilleur": "Read,Glob,Grep,Write",
+    # le planificateur observe et écrit le backlog (atelier/plan.md), jamais Bash/Edit : il ne code pas
+    "planificateur": "Read,Glob,Grep,Write",
 }
 
 

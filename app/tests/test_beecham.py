@@ -313,3 +313,13 @@ def test_garde_fou_ecriture_deny_by_default(tmp_path):
 
     # deny-by-default : zones vides => tout refusé
     assert not beecham.zone_ecriture_autorisee(str(wt / "x"), [])
+
+
+def test_role_planificateur_existe_et_est_scope():
+    assert "planificateur" in beecham.ROLES
+    texte = beecham.ROLES["planificateur"]
+    assert "plan" in texte or "planifi" in texte
+
+    outils = beecham._OUTILS["planificateur"]
+    assert "Bash" not in outils
+    assert "Edit" not in outils
