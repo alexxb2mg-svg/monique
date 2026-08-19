@@ -1,3 +1,7 @@
+{% if m.tables_manquantes %}
+<div class="indispo">Table(s) attendue(s) introuvable(s) : {{ m.tables_manquantes | join(", ") }}</div>
+{% endif %}
+
 <div class="cartesmon">
   <div class="mon">
     <div class="lab">Collecte</div>
