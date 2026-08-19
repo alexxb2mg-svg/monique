@@ -27,5 +27,6 @@ def test_resoudre_besoin_present(tmp_path):
 
 def test_diagnostic_signale_manque(tmp_path):
     diag = decouverte.diagnostic(_fixture(tmp_path))
-    assert "synthese" in diag["manques"]  # sec_synthese absente de la fixture
+    assert "synthese" not in diag["manques"]  # besoin retiré de BESOINS (jamais consommé)
+    assert "constantes" in diag["manques"]  # sys_constants absente de la fixture
     assert "taches" not in diag["manques"]

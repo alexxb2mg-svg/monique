@@ -2,6 +2,7 @@
 
 import re
 
+import decouverte
 from store import STORE, connexion_ro
 
 
@@ -14,6 +15,7 @@ def etat_moteur(chemin: str | None = None) -> dict:
         "dernier_passage": None,
         "entrees_jour": 0,
         "a_traiter": 0,
+        "tables_manquantes": [],
     }
     try:
         con = connexion_ro(chemin or STORE)
@@ -29,11 +31,19 @@ def etat_moteur(chemin: str | None = None) -> dict:
         jour = con.execute(
             "SELECT COUNT(*) FROM sys_incoming_events WHERE date(timestamp)=date('now')"
         ).fetchone()[0]
+        # Observabilité en plus, pas à la place : la robustesse (ne pas planter) est déjà acquise
+        # par le fail-soft ci-dessus (cf. diagnostic_decouverte_orphelin.md §4). Un échec du
+        # diagnostic lui-même ne doit pas dégrader l'état du moteur déjà lu avec succès.
+        try:
+            tables_manquantes = decouverte.diagnostic(chemin or STORE)["manques"]
+        except Exception:
+            tables_manquantes = []
         return {
             "collecte_active": dernier is not None,
             "dernier_passage": dernier[0] if dernier else None,
             "entrees_jour": jour,
             "a_traiter": a_traiter,
+            "tables_manquantes": tables_manquantes,
         }
     except Exception:
         return etat_vide
