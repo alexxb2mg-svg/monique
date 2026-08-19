@@ -4,6 +4,7 @@ import entrepot
 import cerveau
 import estop
 import fournisseurs
+import superviseur
 import tarifs
 
 
@@ -38,7 +39,7 @@ def test_appel_claude_cli_compte_usage(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cerveau,
         "_lancer_claude_cli",
-        lambda prompt, system, prof: {
+        lambda prompt, system, prof, agent=None, task=None: {
             "texte": "Bonjour",
             "input_tokens": 12,
             "output_tokens": 3,
@@ -166,6 +167,62 @@ def test_appeler_modele_non_tarife_cost_status_unknown(tmp_path, monkeypatch):
         con.close()
     assert c["cost_status"] == "unknown"
     assert c["estimated_cost_usd"] == 0.0
+
+
+def _subprocess_popen_claude_cli(ligne_result):
+    """Remplace cerveau.subprocess.Popen : faux process dont stdout nourrit le thread
+    lecteur avec une seule ligne JSON (même esprit que _subprocess_popen_capture dans
+    test_beecham.py, adapté ici pour un stdout ITÉRABLE — pas juste communicate())."""
+
+    class FauxProc:
+        pid = 424242
+        stdout = [ligne_result]
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            pass
+
+    return lambda *a, **k: FauxProc()
+
+
+def test_lancer_claude_cli_enregistre_et_desenregistre_au_superviseur(monkeypatch):
+    """D-16 : le process claude -p est inscrit au superviseur (Trou A, diagnostic
+    diagnostic_d16_registre_taches.md §3 M1) et désinscrit en finally, quel que soit
+    l'agent/tâche appelant."""
+    appels_enr = []
+    appels_fin = []
+
+    def faux_enregistrer(pid, nom, proprietaire, but, ppid=None, chemin=None):
+        appels_enr.append(
+            {"pid": pid, "nom": nom, "proprietaire": proprietaire, "but": but}
+        )
+        return "pTEST1234"
+
+    def faux_finir(rid, statut="fini", chemin=None):
+        appels_fin.append(rid)
+
+    monkeypatch.setattr(superviseur, "enregistrer", faux_enregistrer)
+    monkeypatch.setattr(superviseur, "finir", faux_finir)
+    monkeypatch.setattr(
+        cerveau.subprocess,
+        "Popen",
+        _subprocess_popen_claude_cli(
+            '{"type": "result", "result": "Bonjour",'
+            ' "usage": {"input_tokens": 1, "output_tokens": 1}}\n'
+        ),
+    )
+
+    r = cerveau._lancer_claude_cli(
+        "salut", None, PROF, agent="secretaire", task="brouillon test"
+    )
+
+    assert len(appels_enr) == 1
+    assert appels_enr[0]["proprietaire"] == "secretaire"
+    assert appels_enr[0]["but"].startswith("brouillon test")
+    assert appels_fin == ["pTEST1234"]  # même rid que celui rendu par enregistrer
+    assert r == {"texte": "Bonjour", "input_tokens": 1, "output_tokens": 1}
 
 
 def test_spillover_tronque(tmp_path, monkeypatch):
