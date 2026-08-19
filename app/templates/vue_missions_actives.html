@@ -1,0 +1,19 @@
+<div class="besoin-titre">Missions actives — le travail en cours de la brigade</div>
+
+{% for m in missions %}
+  <div class="mini bm">
+    <div class="bm-corps">
+      <div class="bm-l1">
+        <span class="agent-tag">{{ m.id }}</span>
+      </div>
+      <div class="bm-consigne">{{ m.consigne[:80] }}</div>
+
+      {% if m.journal_liste %}
+        <p class="sous">Ce que l'agent a fait</p>
+        <ul class="attendu">{% for j in m.journal_liste[-3:] %}<li>{{ j }}</li>{% endfor %}</ul>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  <p class="vide">Aucune mission en cours.</p>
+{% endfor %}
