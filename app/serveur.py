@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -521,6 +521,11 @@ def _processus_ctx():
 @app.get("/vue/processus", response_class=HTMLResponse)
 def vue_processus(request: Request):
     return tpl.TemplateResponse(request, "vue_processus.html", _processus_ctx())
+
+
+@app.get("/api/processus")
+def api_processus():
+    return JSONResponse(_processus_ctx())
 
 
 @app.post("/processus/balayer", response_class=HTMLResponse)

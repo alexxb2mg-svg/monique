@@ -52,6 +52,20 @@ def test_vue_relances(monkeypatch):
     assert r.status_code == 200 and "D26070009" in r.text
 
 
+def test_api_processus(monkeypatch):
+    monkeypatch.setattr(
+        superviseur,
+        "etat",
+        lambda chemin=None: [{"rid": "abc123", "commande": "claude", "statut": "running"}],
+    )
+    monkeypatch.setattr(superviseur, "orphelins_vivants", lambda chemin=None: [])
+    r = TestClient(app).get("/api/processus")
+    assert r.status_code == 200
+    corps = r.json()
+    assert "procs" in corps and "orphelins" in corps
+    assert corps["procs"][0]["rid"] == "abc123"
+
+
 def test_vue_recherche(monkeypatch):
     monkeypatch.setattr(
         beecham,
