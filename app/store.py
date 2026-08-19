@@ -5,8 +5,11 @@ Le chemin du store vient de config (variable d'environnement MONIQUE_STORE) — 
 """
 
 import sqlite3
+import logging
 
 import config
+
+LOG = logging.getLogger(__name__)
 
 STORE = config.REEL
 
@@ -42,6 +45,10 @@ def lire_taches(
             rows = [dict(r) for r in cur.fetchall()]
         finally:
             con.close()
+    except sqlite3.OperationalError as e:
+        if "lock" in str(e).lower():
+            LOG.warning("store: base verrouillée (contention) sur %s: %s", chemin, e)
+        return []
     except Exception:
         return []
 
