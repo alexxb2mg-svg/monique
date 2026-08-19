@@ -29,10 +29,16 @@ WORKTREES = RACINE.parent / ".beecham_worktrees"  # hors dépôt, jamais version
 # fenêtre d'observation de l'utilisateur. Page blanche : Beecham l'organise comme il veut.
 # Zone d'écriture LIBRE autorisée (avec la branche de code) ; tout le reste est refusé.
 ATELIER = RACINE.parent / "atelier"
+# Mémoire entre les missions (cf. atelier/01_organisation.md §a) : un digest append-only
+# (journal.md), un backlog priorisé (plan.md) et une note par agent-persona (memoire/<agent>.md).
+MEMOIRE = ATELIER / "memoire"
+JOURNAL = ATELIER / "journal.md"
+PLAN = ATELIER / "plan.md"
 
 
 def init_atelier() -> Path:
     ATELIER.mkdir(parents=True, exist_ok=True)
+    MEMOIRE.mkdir(parents=True, exist_ok=True)
     accueil = ATELIER / "LISEZMOI.md"
     if not accueil.exists():
         accueil.write_text(
@@ -45,7 +51,49 @@ def init_atelier() -> Path:
             "touchent JAMAIS. Toute action sur la production est fictive, décrite ici.\n",
             encoding="utf-8",
         )
+    if not JOURNAL.exists():
+        JOURNAL.write_text(
+            "# Journal\n\n"
+            "Digest humain, append-only — une ligne par mission terminée. La trace complète\n"
+            "(consigne, diff, tests) reste dans `secw_beecham_missions` (`lister_missions`).\n"
+            "Jamais réécrit, seulement complété.\n\n",
+            encoding="utf-8",
+        )
+    if not PLAN.exists():
+        PLAN.write_text(
+            "# Plan\n\n"
+            "Backlog priorisé des prochains pas, chacun avec son pourquoi-maintenant en une\n"
+            "ligne.\n\n",
+            encoding="utf-8",
+        )
     return ATELIER
+
+
+def journal_ajouter(agent, resume, statut) -> None:
+    """Ajoute une ligne datée à journal.md (append-only, jamais réécrit). Fail-soft : une
+    erreur d'écriture (ex. disque plein) ne doit jamais faire échouer une mission."""
+    init_atelier()
+    ligne = f"- {_now()} · {agent} · {resume} · {statut}\n"
+    try:
+        with open(JOURNAL, "a", encoding="utf-8") as f:
+            f.write(ligne)
+    except OSError:
+        pass
+
+
+def chemin_memoire(role) -> Path:
+    """Chemin de la note mémoire d'un agent-persona (atelier/memoire/<role>.md), créée avec
+    un en-tête si elle manque."""
+    init_atelier()
+    fichier = MEMOIRE / f"{role}.md"
+    if not fichier.exists():
+        fichier.write_text(
+            f"# Mémoire — {role}\n\n"
+            "Conventions du dépôt observées, pièges déjà rencontrés, décisions déjà prises —\n"
+            "à relire au début d'une mission, à compléter à la fin.\n\n",
+            encoding="utf-8",
+        )
+    return fichier
 
 
 def zone_ecriture_autorisee(chemin: str, zones: list[str]) -> bool:

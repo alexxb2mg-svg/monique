@@ -111,6 +111,46 @@ def test_atelier_page_blanche(tmp_path, monkeypatch):
     assert "LISEZMOI.md" in noms and "note_chercheur.md" in noms
 
 
+def _atelier_isole(tmp_path, monkeypatch):
+    """Redirige toutes les constantes de l'atelier vers tmp_path — jamais le vrai atelier."""
+    atelier = tmp_path / "atelier"
+    monkeypatch.setattr(beecham, "ATELIER", atelier)
+    monkeypatch.setattr(beecham, "MEMOIRE", atelier / "memoire")
+    monkeypatch.setattr(beecham, "JOURNAL", atelier / "journal.md")
+    monkeypatch.setattr(beecham, "PLAN", atelier / "plan.md")
+    return atelier
+
+
+def test_init_atelier_cree_memoire_journal_plan(tmp_path, monkeypatch):
+    atelier = _atelier_isole(tmp_path, monkeypatch)
+    beecham.init_atelier()
+    assert (atelier / "memoire").is_dir()
+    assert (atelier / "journal.md").exists()
+    assert (atelier / "plan.md").exists()
+
+
+def test_journal_ajouter_est_append_only(tmp_path, monkeypatch):
+    _atelier_isole(tmp_path, monkeypatch)
+    beecham.journal_ajouter("developpeur", "première mission", "propose")
+    contenu_1 = beecham.JOURNAL.read_text(encoding="utf-8")
+    assert "première mission" in contenu_1
+
+    beecham.journal_ajouter("controleur", "deuxième mission", "valide")
+    contenu_2 = beecham.JOURNAL.read_text(encoding="utf-8")
+    # la ligne précédente n'est jamais écrasée, la nouvelle s'ajoute
+    assert "première mission" in contenu_2
+    assert "deuxième mission" in contenu_2
+    assert contenu_2.index("première mission") < contenu_2.index("deuxième mission")
+
+
+def test_chemin_memoire_cree_le_fichier_avec_en_tete(tmp_path, monkeypatch):
+    atelier = _atelier_isole(tmp_path, monkeypatch)
+    chemin = beecham.chemin_memoire("chercheur")
+    assert chemin == atelier / "memoire" / "chercheur.md"
+    assert chemin.exists()
+    assert "chercheur" in chemin.read_text(encoding="utf-8")
+
+
 def test_garde_fou_ecriture_deny_by_default(tmp_path):
     wt = tmp_path / "worktree"
     atelier = tmp_path / "atelier"
