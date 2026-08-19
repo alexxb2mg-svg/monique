@@ -1,0 +1,8 @@
+<div class="besoin-titre">Approvisionnement</div>
+{% for f in fournisseurs %}
+  <div class="rel">
+    <div class="r1"><span class="ref">{{ f.nom }}</span></div>
+  </div>
+{% else %}
+  <p class="vide">Aucun fournisseur enregistré pour l'instant.</p>
+{% endfor %}
