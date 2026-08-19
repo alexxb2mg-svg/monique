@@ -286,6 +286,13 @@ ROLES = {
     "n'existe encore : tu ne l'inventes JAMAIS (ni prix, ni référence, ni nom de fournisseur "
     "que tu n'as pas sous les yeux) — tu documentes ce qui manque et proposes des pistes "
     "plutôt que d'halluciner un catalogue.",
+    "documentaliste": "Tu es le documentaliste de Monique. Ton mandat : tenir à jour un "
+    "catalogue des tarifs des modèles IA (DeepSeek, Mistral, Grok/xAI, OpenAI, Anthropic, "
+    "Google, etc.) — prix par million de tokens en entrée/sortie — avec la source officielle "
+    "et la date de vérification pour chaque valeur. Tu ne codes pas. Tu ne mets JAMAIS un "
+    "tarif que tu n'as pas confirmé à sa source officielle : toute valeur non vérifiée est "
+    "marquée [NON VÉRIFIÉ]. Tu stockes cette donnée dans un fichier structuré simple, jamais "
+    "en dur dans le code.",
 }
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
@@ -315,6 +322,9 @@ _OUTILS = {
     # fournisseurs_materiel documente/cherche mais aucune source n'est encore validée par Alex :
     # même registre lecture/écriture que le chercheur, sans WebSearch pour l'instant
     "fournisseurs_materiel": "Read,Glob,Grep,Write,WebFetch",
+    # le documentaliste doit pouvoir vérifier des tarifs officiels dehors : mêmes outils que
+    # le chercheur (Read/Glob/Grep/Write + web)
+    "documentaliste": "Read,Glob,Grep,Write,WebSearch,WebFetch",
 }
 
 
