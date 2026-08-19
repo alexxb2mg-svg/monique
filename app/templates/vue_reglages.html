@@ -15,3 +15,21 @@
   </div>
   <div class="actions"><button class="btn primaire" type="submit">Enregistrer</button></div>
 </form>
+
+<div class="besoin-titre">Réglages du chercheur</div>
+{% if enregistre_chercheur %}<div class="bandeau">Réglages enregistrés.</div>{% endif %}
+<form hx-post="/reglages/chercheur" hx-target="#vue">
+  <div class="champ-bloc">
+    <label class="lab">Fréquence de veille</label>
+    <select class="champ" name="veille_freq">
+      {% for opt in options_freq %}
+      <option value="{{ opt }}"{% if opt == chercheur_veille_freq %} selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="champ-bloc">
+    <label class="lab">Canaux surveillés</label>
+    <input class="champ" type="text" name="canaux" value="{{ chercheur_canaux }}" placeholder="web">
+  </div>
+  <div class="actions"><button class="btn primaire" type="submit">Enregistrer</button></div>
+</form>

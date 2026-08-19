@@ -28,6 +28,13 @@ def test_vue_reglages_affiche_valeurs(monkeypatch):
     assert "Fréquence de veille" in r.text and "mail,wa" in r.text
 
 
+def test_vue_reglages_affiche_bloc_chercheur(monkeypatch):
+    monkeypatch.setattr(config, "cfg_get", lambda s, c, d=None: d)
+    r = _client().get("/vue/reglages")
+    assert r.status_code == 200
+    assert 'hx-post="/reglages/chercheur"' in r.text
+
+
 def test_maj_reglages_appelle_definir_sans_ecrire_reel(monkeypatch):
     vus = []
     monkeypatch.setattr(
