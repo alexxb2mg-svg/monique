@@ -13,3 +13,42 @@
     <div class="val">{{ m.entrees_jour }} <small>/ {{ m.a_traiter }} à traiter</small></div>
   </div>
 </div>
+
+{% if chantier.disponible %}
+<div class="rupture"></div>
+<div class="h3">Chantier de Beecham — ce que la brigade construit</div>
+<div class="cartesmon">
+  <div class="mon">
+    <div class="lab">En cours</div>
+    <div class="val">{{ chantier.compte.en_cours }}</div>
+  </div>
+  <div class="mon">
+    <div class="lab">Fusionnés</div>
+    <div class="val" style="color:var(--vert)">{{ chantier.compte.fusionnes }}</div>
+  </div>
+  <div class="mon">
+    <div class="lab">Rejetés / échecs</div>
+    <div class="val" style="color:var(--grisdoux)">{{ chantier.compte.rates }}</div>
+  </div>
+</div>
+
+{% if chantier.en_cours %}
+<div class="sous">Sujets en cours</div>
+{% for s in chantier.en_cours %}
+<div class="mini bm"><div class="bm-corps">
+  <div class="bm-l1"><span class="badge">en cours</span> <span class="heure">{{ s.heure }}</span></div>
+  <div class="bm-consigne">{{ s.sujet }}</div>
+</div></div>
+{% endfor %}
+{% endif %}
+
+<div class="sous">Derniers sujets fusionnés</div>
+{% for s in chantier.fusionnes %}
+<div class="mini bm"><div class="bm-corps">
+  <div class="bm-l1"><span class="badge badge-valide">fusionné</span> <span class="heure">{{ s.heure }}</span></div>
+  <div class="bm-consigne">{{ s.sujet }}</div>
+</div></div>
+{% else %}
+<p class="vide">Rien de fusionné pour l'instant.</p>
+{% endfor %}
+{% endif %}

@@ -190,7 +190,9 @@ def vue_relances(request: Request):
 @app.get("/vue/monitoring", response_class=HTMLResponse)
 def vue_monitoring(request: Request):
     return tpl.TemplateResponse(
-        request, "vue_monitoring.html", {"m": monitoring.etat_moteur()}
+        request,
+        "vue_monitoring.html",
+        {"m": monitoring.etat_moteur(), "chantier": monitoring.chantier_brigade()},
     )
 
 
