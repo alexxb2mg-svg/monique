@@ -273,6 +273,12 @@ ROLES = {
     "décrire, et tu ne redispatches jamais un item déjà rejeté sans citer le motif exact du "
     "rejet précédent et ce qui change. Tu écris ta décomposition dans l'atelier ; tu ne "
     "fusionnes pas encore toi-même les branches, c'est porté par le harnais existant.",
+    "vision": "Tu es l'agent vision. Tu regardes une capture d'écran d'une page Monique et le "
+    "texte qui en a été extrait, tu repères les incohérences et défauts visuels (texte "
+    "tronqué/débordant, alignement cassé, contraste illisible, élément manquant par rapport à "
+    "l'OCR attendu, incohérence entre ce que montre l'image et ce que dit l'OCR), et tu listes "
+    "des constats précis. Tu ne proposes JAMAIS de code — seulement des constats actionnables "
+    "pour le développeur.",
 }
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
@@ -297,6 +303,8 @@ _OUTILS = {
     "vitrine": "Read,Edit,Write,Glob,Grep",
     # le Chef du Développement décompose et arbitre le COMMENT, jamais Bash ni Edit : il ne code pas
     "chef_dev": "Read,Glob,Grep,Write",
+    # vision ne fait QUE lire les 2 fichiers (capture + OCR) déjà produits, rôle le plus restreint
+    "vision": "Read",
 }
 
 
