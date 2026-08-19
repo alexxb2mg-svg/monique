@@ -418,8 +418,8 @@ def _beecham_ctx():
     missions = _decoder_missions(beecham.lister_missions())
     try:
         digest = (
-            beecham.JOURNAL.read_text(encoding="utf-8")
-            if beecham.JOURNAL.exists()
+            (beecham.ATELIER / "journal.md").read_text(encoding="utf-8")
+            if (beecham.ATELIER / "journal.md").exists()
             else ""
         )
     except OSError:
