@@ -30,16 +30,20 @@ def lire_taches(
     Tri repris du dashboard existant : confiance décroissante puis id décroissant.
     """
     chemin = chemin or STORE
-    con = connexion_ro(chemin)
+    # FAIL-SOFT : store réel absent/illisible (fresh install) => liste vide, jamais un 500.
     try:
-        cur = con.execute(
-            "SELECT * FROM sec_taches WHERE type=? AND statut!='regle' "
-            "ORDER BY confiance DESC, id DESC",
-            (kind,),
-        )
-        rows = [dict(r) for r in cur.fetchall()]
-    finally:
-        con.close()
+        con = connexion_ro(chemin)
+        try:
+            cur = con.execute(
+                "SELECT * FROM sec_taches WHERE type=? AND statut!='regle' "
+                "ORDER BY confiance DESC, id DESC",
+                (kind,),
+            )
+            rows = [dict(r) for r in cur.fetchall()]
+        finally:
+            con.close()
+    except Exception:
+        return []
 
     # Fusion overlay (Phase 2b) : une tâche cochée (secw_taches_overlay, statut='regle') est exclue.
     # L'overlay vit dans la base d'ÉCRITURE (shadow en test, réel en prod) — là où `cocher_tache`

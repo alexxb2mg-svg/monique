@@ -353,16 +353,30 @@ def _decoder_missions(missions):
             d["tests"] = json.loads(d.get("tests_json") or "null")
         except (TypeError, ValueError):
             d["tests"] = None
+        try:
+            d["agents"] = json.loads(d.get("agents_json") or "[]")
+        except (TypeError, ValueError):
+            d["agents"] = []
         out.append(d)
     return out
 
 
 def _beecham_ctx():
     missions = _decoder_missions(beecham.lister_missions())
+    try:
+        digest = (
+            beecham.JOURNAL.read_text(encoding="utf-8")
+            if beecham.JOURNAL.exists()
+            else ""
+        )
+    except OSError:
+        digest = ""
     return {
         "missions": missions,
         "roles": list(beecham.ROLES),
         "en_cours_actif": any(m.get("statut") == "en_cours" for m in missions),
+        "digest": digest,
+        "atelier": beecham.lister_atelier(),
     }
 
 

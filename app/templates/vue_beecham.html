@@ -1,14 +1,14 @@
-<div class="besoin-titre">Beecham — chef d'orchestre</div>
+<div class="besoin-titre">Beecham — la salle des machines</div>
 
 <form hx-post="/beecham/mission" hx-target="#vue">
   <div class="champ-bloc">
     <label class="lab">Consigne</label>
-    <textarea class="champ" name="consigne" rows="3" placeholder="Décris la mission à confier à la brigade…" required></textarea>
+    <textarea class="champ" name="consigne" rows="3" placeholder="Décris la mission… (choisis « chef » pour parler à Beecham directement)" required></textarea>
   </div>
   <div class="champ-bloc">
-    <label class="lab">Rôle</label>
+    <label class="lab">À qui ?</label>
     <select class="champ" name="role">
-      {% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+      {% for r in roles %}<option value="{{ r }}"{% if r == 'chef' %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
   </div>
   <div class="actions"><button class="btn primaire" type="submit">Lancer une mission</button></div>
@@ -16,38 +16,47 @@
 
 <div class="rupture"></div>
 
-<div class="h3">Missions récentes</div>
-<div id="beecham-liste"{% if en_cours_actif %} hx-get="/vue/beecham" hx-trigger="every 4s" hx-target="#vue"{% endif %}>
+{% if digest %}
+  <div class="h3">Journal de la brigade</div>
+  <pre class="diff" style="max-height:180px">{{ digest }}</pre>
+{% endif %}
+
+<div class="h3">Missions — le travail des agents</div>
+<div id="beecham-liste"{% if en_cours_actif %} hx-get="/vue/beecham" hx-trigger="every 3s" hx-target="#vue"{% endif %}>
 {% for m in missions %}
   <div class="mini bm">
     <div class="bm-corps">
       <div class="bm-l1">
         <span class="badge badge-{{ m.statut }}">{{ m.statut }}</span>
+        {% if m.agents %}<span class="agent-tag">{{ m.agents|join(', ') }}</span>{% endif %}
         <span class="heure">{{ m.cree_le }}</span>
       </div>
       <div class="bm-consigne">{{ m.consigne }}</div>
 
       {% if m.statut == 'en_cours' %}
-        <p class="vide">⏳ en cours…</p>
-      {% elif m.statut == 'propose' %}
-        {% if m.journal_liste %}
-          <p class="sous">Journal</p>
-          <ul class="attendu">{% for j in m.journal_liste %}<li>{{ j }}</li>{% endfor %}</ul>
-        {% endif %}
-        {% if m.tests %}
-          <p class="sous">Tests</p>
-          <p><span class="badge {{ 'badge-ok' if m.tests.ok else 'badge-echec' }}">{{ 'verts' if m.tests.ok else 'rouges' }}</span> {{ m.tests.resume }}</p>
-        {% endif %}
-        {% if m.diff %}
-          <p class="sous">Diff</p>
-          <pre class="diff">{{ m.diff }}</pre>
-        {% endif %}
+        <p class="vide">⏳ au travail…</p>
+      {% endif %}
+
+      {% if m.journal_liste %}
+        <p class="sous">Ce que l'agent a fait</p>
+        <ul class="attendu">{% for j in m.journal_liste %}<li>{{ j }}</li>{% endfor %}</ul>
+      {% endif %}
+
+      {% if m.tests %}
+        <p><span class="badge {{ 'badge-ok' if m.tests.ok else 'badge-echec' }}">{{ 'tests verts' if m.tests.ok else 'tests rouges' }}</span> {{ m.tests.resume }}</p>
+      {% endif %}
+
+      {% if m.diff %}
+        <p class="sous">Diff</p>
+        <pre class="diff">{{ m.diff }}</pre>
+      {% endif %}
+
+      {% if m.statut == 'bloque' %}
+        <p class="sous">⚠ Bloqué après plusieurs tours — le contrôleur n'a pas pu valider. À toi de trancher :</p>
         <div class="actions">
-          <button class="btn primaire" hx-post="/beecham/{{ m.id }}/valider" hx-target="#vue">Fusionner</button>
+          <button class="btn primaire" hx-post="/beecham/{{ m.id }}/valider" hx-target="#vue">Valider quand même</button>
           <button class="btn" hx-post="/beecham/{{ m.id }}/rejeter" hx-target="#vue">Jeter</button>
         </div>
-      {% else %}
-        <p class="vide">Statut : {{ m.statut }}</p>
       {% endif %}
     </div>
   </div>
@@ -55,3 +64,14 @@
   <p class="vide">Aucune mission encore.</p>
 {% endfor %}
 </div>
+
+<div class="rupture"></div>
+
+<div class="h3">Atelier — ce que la brigade produit</div>
+{% if atelier %}
+  <ul class="attendu">
+    {% for f in atelier %}<li><code>{{ f.chemin }}</code> <span class="heure">{{ f.octets }} o</span></li>{% endfor %}
+  </ul>
+{% else %}
+  <p class="vide">Atelier vide pour l'instant.</p>
+{% endif %}

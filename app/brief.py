@@ -5,17 +5,23 @@ import relances
 
 
 def construire(chemin: str | None = None) -> dict:
-    con = connexion_ro(chemin or STORE)
+    # FAIL-SOFT : store réel absent/illisible (fresh install, MONIQUE_STORE non branché) => brief
+    # vide plutôt qu'un 500. Le vrai store, quand il est là, remplit tout normalement.
+    mails = retard = 0
     try:
-        mails = con.execute(
-            "SELECT COUNT(*) FROM sys_incoming_events WHERE processed_at IS NULL"
-        ).fetchone()[0]
-        retard = con.execute(
-            "SELECT COUNT(*) FROM sec_taches WHERE statut!='regle' "
-            "AND echeance IS NOT NULL AND echeance != '' AND echeance < date('now')"
-        ).fetchone()[0]
-    finally:
-        con.close()
+        con = connexion_ro(chemin or STORE)
+        try:
+            mails = con.execute(
+                "SELECT COUNT(*) FROM sys_incoming_events WHERE processed_at IS NULL"
+            ).fetchone()[0]
+            retard = con.execute(
+                "SELECT COUNT(*) FROM sec_taches WHERE statut!='regle' "
+                "AND echeance IS NOT NULL AND echeance != '' AND echeance < date('now')"
+            ).fetchone()[0]
+        finally:
+            con.close()
+    except Exception:
+        pass
 
     try:
         e = relances.etat()

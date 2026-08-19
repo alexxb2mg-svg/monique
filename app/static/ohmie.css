@@ -171,3 +171,11 @@ form.parler input{flex:1;font-family:inherit;font-size:13px;border:1.5px solid v
 .badge-echec{background:#fde8e8;color:var(--alerte);border-color:#f6c6c6}
 .diff{background:var(--fond);border:1.5px solid var(--regle);border-radius:9px;padding:10px 12px;
   font-family:ui-monospace,monospace;font-size:12px;line-height:1.4;white-space:pre;overflow:auto;max-height:340px}
+
+/* Salle des machines — étiquette d'agent + couleurs de statut */
+.agent-tag{display:inline-block;padding:1px 8px;border-radius:10px;background:#3a2f28;color:#e8c9a8;font-size:.8em;font-weight:600}
+.badge-livre{background:#2f4632;color:#bfe3c2}
+.badge-valide{background:#26492b;color:#a8e6b0}
+.badge-rejete{background:#4a2b2b;color:#e6b0b0}
+.badge-bloque{background:#4a422b;color:#e6d7a0}
+.badge-en_cours{background:#2b3a4a;color:#a8cbe6}

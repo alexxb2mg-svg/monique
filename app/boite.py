@@ -35,7 +35,11 @@ def lire_event(event_id: int, chemin: str | None = None) -> dict | None:
 
 
 def lire_boite(chemin: str | None = None, limite: int = 50) -> list[dict]:
-    con = connexion_ro(chemin or STORE)
+    # FAIL-SOFT : store réel absent/illisible (fresh install) => boîte vide, jamais un 500.
+    try:
+        con = connexion_ro(chemin or STORE)
+    except Exception:
+        return []
     try:
         cur = con.execute(
             "SELECT id, source, raw_content, status, timestamp, processed_at "
