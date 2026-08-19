@@ -4,6 +4,7 @@ import entrepot
 import cerveau
 import estop
 import fournisseurs
+import tarifs
 
 
 def _db(tmp_path):
@@ -48,11 +49,15 @@ def test_appel_claude_cli_compte_usage(tmp_path, monkeypatch):
     con = entrepot.connexion_ecriture(db)
     try:
         c = con.execute(
-            "SELECT calls, input_tokens FROM secw_model_usage WHERE agent='secretaire'"
+            "SELECT calls, input_tokens, estimated_cost_usd FROM secw_model_usage"
+            " WHERE agent='secretaire'"
         ).fetchone()
     finally:
         con.close()
     assert c["calls"] == 1 and c["input_tokens"] == 12
+    attendu = tarifs.estimer_cout_usd("sonnet", 12, 3)
+    assert c["estimated_cost_usd"] > 0
+    assert c["estimated_cost_usd"] == attendu
 
 
 def test_estop_bloque(tmp_path, monkeypatch):

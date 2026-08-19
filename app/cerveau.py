@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 
 import estop
+import tarifs
 import usage
 
 CREATE_NO_WINDOW = 0x08000000
@@ -228,6 +229,9 @@ def appeler(
         }
 
     cout_status = "included" if profile.mode == "claude_cli" else "estimated"
+    cout = tarifs.estimer_cout_usd(
+        profile.model, res.get("input_tokens", 0), res.get("output_tokens", 0)
+    )
     usage.compter(
         agent,
         profile.model,
@@ -235,6 +239,7 @@ def appeler(
         task,
         res.get("input_tokens", 0),
         res.get("output_tokens", 0),
+        estimated_cost_usd=cout if cout is not None else 0.0,
         cost_status=cout_status,
         chemin=chemin,
     )
