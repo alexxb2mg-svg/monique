@@ -427,6 +427,13 @@ def missions_actives():
     return vue_missions.contexte_missions_actives()
 
 
+@app.get("/vue/missions/actives", response_class=HTMLResponse)
+def vue_missions_actives_html(request: Request):
+    return tpl.TemplateResponse(
+        request, "vue_missions_actives.html", {"missions": vue_missions.contexte_missions_actives()}
+    )
+
+
 @app.post("/beecham/mission", response_class=HTMLResponse)
 def creer_mission_beecham(
     request: Request, consigne: str = Form(...), role: str = Form(...)
