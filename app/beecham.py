@@ -596,15 +596,26 @@ def _lancer_controleur(scope, diff, tests_resume, worktree, _agent=None) -> dict
     )
     res = agent("controleur", consigne, worktree)
     texte = res.get("texte", "") if isinstance(res, dict) else ""
-    premiere = _normaliser_verdict(
-        next((li for li in texte.splitlines() if li.strip()), "")
-    )
-    if "ACCEPTE" in premiere:
+    # Verdict lu sur la LIGNE ancrée « VERDICT… » (dernière occurrence), insensible aux accents.
+    # Ancrer sur une ligne qui COMMENCE par VERDICT protège de l'anti-citation (une citation du
+    # verdict opposé en milieu de phrase n'ouvre pas une ligne) TOUT EN captant le verdict même
+    # quand l'agent raisonne d'abord et conclut plus bas — incident 2026-08-19 : des « VERDICT:
+    # ACCEPTÉ » posés en L3+ étaient ratés par le parse « 1re ligne seule » puis JETÉS par défaut.
+    ligne_verdict = None
+    for li in texte.splitlines():
+        n = _normaliser_verdict(li).strip()
+        if n.startswith("VERDICT"):
+            ligne_verdict = n
+    if ligne_verdict is None:
+        verdict = "corriger"  # défaut SÛR : récupérable (on renvoie au dev), jamais l'abandon sec
+    elif "ACCEPTE" in ligne_verdict:
         verdict = "accepte"
-    elif "CORRIGER" in premiere:
+    elif "CORRIGER" in ligne_verdict:
         verdict = "corriger"
-    else:
+    elif "REJETE" in ligne_verdict:
         verdict = "rejeter"
+    else:
+        verdict = "corriger"
     return {"verdict": verdict, "raison": texte}
 
 

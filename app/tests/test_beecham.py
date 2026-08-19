@@ -37,6 +37,45 @@ def _agent_ecrit(nom, contenu="VALEUR = 42\n"):
     return faux_agent
 
 
+def _controleur_qui_dit(texte):
+    """Agent factice : le contrôleur renvoie EXACTEMENT `texte` — pour tester le parse du verdict."""
+
+    def faux(role, consigne, worktree, reprendre=None):
+        return {"ok": True, "journal": [], "texte": texte}
+
+    return faux
+
+
+def test_verdict_accepte_hors_premiere_ligne(tmp_path):
+    """Régression 2026-08-19 : le contrôleur raisonne d'abord, « VERDICT: ACCEPTÉ » en L3 — ne doit
+    PLUS être jeté. L'ancien parse « 1re ligne non vide seule » ratait le verdict et rejetait par
+    défaut, gâchant du code accepté."""
+    texte = "Le statut git confirme le scope exact.\n\nVERDICT: ACCEPTÉ\n\nVérifs effectuées : ok."
+    v = beecham._lancer_controleur(
+        "scope", "diff", "1 passed", str(tmp_path), _agent=_controleur_qui_dit(texte)
+    )
+    assert v["verdict"] == "accepte"
+
+
+def test_verdict_citation_trompeuse_reste_rejete(tmp_path):
+    """Anti-citation : une mention « ACCEPTÉ » en milieu de phrase ne prime pas sur la ligne
+    « VERDICT: REJETÉ ». L'ancrage sur une ligne qui DÉBUTE par VERDICT protège l'incident passé."""
+    texte = "Je pourrais dire ACCEPTÉ vu le vert, mais non.\nVERDICT: REJETÉ\nl'approche casse X."
+    v = beecham._lancer_controleur(
+        "scope", "diff", "1 passed", str(tmp_path), _agent=_controleur_qui_dit(texte)
+    )
+    assert v["verdict"] == "rejeter"
+
+
+def test_verdict_absent_defaut_corriger(tmp_path):
+    """Aucune ligne « VERDICT: » => défaut SÛR « corriger » (récupérable), jamais « rejeter »."""
+    texte = "Analyse en vrac, aucune conclusion formelle."
+    v = beecham._lancer_controleur(
+        "scope", "diff", "1 passed", str(tmp_path), _agent=_controleur_qui_dit(texte)
+    )
+    assert v["verdict"] == "corriger"
+
+
 def test_correction_reprend_la_session_du_dev(tmp_path, monkeypatch):
     """--resume : au tour 2, le dev est relancé avec reprendre=<session_id du tour 1> (pas à froid)."""
     repo = _repo(tmp_path)
