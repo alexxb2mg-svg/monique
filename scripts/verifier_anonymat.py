@@ -64,7 +64,15 @@ _NOREPLY_OK = ("users.noreply.github.com>", "noreply@github.com>")
 MOTIFS_STRUCTURELS: list[tuple[str, re.Pattern[str]]] = [
     (
         "chemin de poste",
-        re.compile(r"[A-Za-z]:[/\\]{1,2}Users[/\\]{1,2}[A-Za-z0-9._-]+", re.IGNORECASE),
+        # Un chemin C:\Users\<compte> fuite une identité — SAUF les comptes intégrés génériques
+        # de Windows (Public, Default, Default User, All Users), qui ne nomment personne. Le
+        # lookahead négatif les exclut ; tout autre nom de compte reste détecté.
+        re.compile(
+            r"[A-Za-z]:[/\\]{1,2}Users[/\\]{1,2}"
+            r"(?!(?:Public|Default|Default User|All Users)(?:[/\\]|$))"
+            r"[A-Za-z0-9._-]+",
+            re.IGNORECASE,
+        ),
     ),
     (
         "email hors noreply",
