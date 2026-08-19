@@ -18,6 +18,9 @@ def _repo(tmp_path):
     (repo / "app" / "test_smoke.py").write_text(
         "def test_ok():\n    assert True\n", encoding="utf-8"
     )
+    # comme le vrai dépôt : ignorer le bruit pytest, sinon `git add -A` du harnais capte les
+    # __pycache__ et un « rien codé » n'aurait pas un diff vide.
+    (repo / ".gitignore").write_text("__pycache__/\n*.pyc\n", encoding="utf-8")
     _git(repo, "init", "-b", "main")
     _git(repo, "config", "user.email", "t@t.t")
     _git(repo, "config", "user.name", "t")
@@ -26,58 +29,137 @@ def _repo(tmp_path):
     return repo
 
 
-def test_beecham_machinerie_bout_en_bout(tmp_path, monkeypatch):
+def _agent_ecrit(nom, contenu="VALEUR = 42\n"):
+    def faux_agent(role, consigne, worktree):
+        (Path(worktree) / "app" / nom).write_text(contenu, encoding="utf-8")
+        return {"ok": True, "journal": [f"{role} · Write {nom}"], "texte": "fait"}
+
+    return faux_agent
+
+
+def test_traitement_auto_accepte_fusionne(tmp_path, monkeypatch):
+    """Traitement AUTOMATIQUE : le contrôleur accepte -> fusion locale, aucune action d'Alex."""
     repo = _repo(tmp_path)
     monkeypatch.setattr(beecham, "RACINE", repo)
     monkeypatch.setattr(beecham, "WORKTREES", tmp_path / "wt")
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")  # journal isolé
     db = str(tmp_path / "shadow.db")
     entrepot.init_fondations(db)
-
     mid = beecham.demarrer_mission("ajouter un module bonjour", db)
 
-    def faux_agent(role, consigne, worktree):
-        # l'agent (ici factice) n'écrit QUE dans la branche isolée
-        (Path(worktree) / "app" / "bonjour.py").write_text(
-            "VALEUR = 42\n", encoding="utf-8"
-        )
-        return {"ok": True, "journal": [f"{role} · Write bonjour.py"], "texte": "fait"}
+    def controleur_ok(scope, diff, tests_resume, worktree):
+        assert "VALEUR = 42" in diff  # revue ancrée sur le diff réel
+        return {"verdict": "accepte", "raison": "conforme au scope"}
 
-    r = beecham.executer_mission(mid, chemin=db, _agent=faux_agent)
-    assert r["ok"] and r["tests_ok"]  # harnais a lancé les tests, verts
-    assert any(
-        "bonjour.py" in f for f in r["fichiers"]
-    )  # nouveau fichier capté dans le diff
-
-    m = beecham.lire_mission(mid, db)
-    assert m["statut"] == "propose"  # gardé : en attente de validation
-    assert "bonjour.py" in m["diff"] and "VALEUR = 42" in m["diff"]
-
-    # isolation : le dépôt principal n'a PAS encore le fichier (tant qu'on n'a pas validé)
-    assert not (repo / "app" / "bonjour.py").exists()
-
-    v = beecham.valider(mid, db)  # l'utilisateur valide -> fusion dans main
-    assert v["ok"]
-    assert (repo / "app" / "bonjour.py").exists()  # maintenant fusionné
+    r = beecham.executer_mission(
+        mid, chemin=db, _agent=_agent_ecrit("bonjour.py"), _controleur=controleur_ok
+    )
+    assert r["statut"] == "valide"
+    assert (repo / "app" / "bonjour.py").exists()  # fusionné dans main, tout seul
     assert beecham.lire_mission(mid, db)["statut"] == "valide"
 
 
-def test_beecham_rejet_ne_touche_pas_main(tmp_path, monkeypatch):
+def test_traitement_auto_rejete_abandonne(tmp_path, monkeypatch):
+    """Rejet PUR (approche mauvaise) : abandon automatique, rien ne fuit dans main."""
     repo = _repo(tmp_path)
     monkeypatch.setattr(beecham, "RACINE", repo)
     monkeypatch.setattr(beecham, "WORKTREES", tmp_path / "wt")
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
     db = str(tmp_path / "shadow.db")
     entrepot.init_fondations(db)
-
     mid = beecham.demarrer_mission("changement à jeter", db)
 
-    def faux_agent(role, consigne, worktree):
-        (Path(worktree) / "app" / "jetable.py").write_text("X = 1\n", encoding="utf-8")
-        return {"ok": True, "journal": [], "texte": ""}
+    def controleur_rejette(scope, diff, tests_resume, worktree):
+        return {"verdict": "rejeter", "raison": "approche mauvaise"}
 
-    beecham.executer_mission(mid, chemin=db, _agent=faux_agent)
-    assert beecham.rejeter(mid, db)["ok"]
+    r = beecham.executer_mission(
+        mid,
+        chemin=db,
+        _agent=_agent_ecrit("jetable.py", "X = 1\n"),
+        _controleur=controleur_rejette,
+    )
+    assert r["statut"] == "rejete"
+    assert not (repo / "app" / "jetable.py").exists()
     assert beecham.lire_mission(mid, db)["statut"] == "rejete"
-    assert not (repo / "app" / "jetable.py").exists()  # rien n'a fui dans main
+
+
+def test_mission_atelier_auto_livree(tmp_path, monkeypatch):
+    """Mission sans diff de code (atelier) -> `livre`, jamais `propose` en attente."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(beecham, "RACINE", repo)
+    monkeypatch.setattr(beecham, "WORKTREES", tmp_path / "wt")
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    db = str(tmp_path / "shadow.db")
+    entrepot.init_fondations(db)
+    mid = beecham.demarrer_mission("juste réfléchir, rien coder", db)
+
+    def agent_sans_code(role, consigne, worktree):
+        return {"ok": True, "journal": [], "texte": "réflexion faite"}
+
+    r = beecham.executer_mission(mid, chemin=db, _agent=agent_sans_code)
+    assert r["statut"] == "livre"
+    assert beecham.lire_mission(mid, db)["statut"] == "livre"
+
+
+def test_corriger_puis_bloque_au_plafond(tmp_path, monkeypatch):
+    """« À corriger » en boucle : borné à max_tours, puis `bloque` (remonté à Alex) — jamais infini."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(beecham, "RACINE", repo)
+    monkeypatch.setattr(beecham, "WORKTREES", tmp_path / "wt")
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    db = str(tmp_path / "shadow.db")
+    entrepot.init_fondations(db)
+    mid = beecham.demarrer_mission("code toujours à corriger", db)
+
+    tours = {"n": 0}
+
+    def controleur_corrige_toujours(scope, diff, tests_resume, worktree):
+        tours["n"] += 1
+        return {"verdict": "corriger", "raison": "encore un point à revoir"}
+
+    r = beecham.executer_mission(
+        mid,
+        chemin=db,
+        _agent=_agent_ecrit("wip.py"),
+        _controleur=controleur_corrige_toujours,
+        max_tours=2,
+    )
+    assert r["statut"] == "bloque"
+    assert tours["n"] == 2  # exactement max_tours, pas de boucle infinie
+    assert beecham.lire_mission(mid, db)["statut"] == "bloque"
+
+
+def test_lancer_controleur_trois_verdicts(tmp_path):
+    """Parsing robuste : 1re ligne seule, accents (ACCEPTÉ==ACCEPTE), et le piège de l'incident."""
+
+    def controleur(texte):
+        return lambda role, consigne, worktree: {
+            "ok": True,
+            "journal": [],
+            "texte": texte,
+        }
+
+    a = beecham._lancer_controleur(
+        "s", "d", "t", tmp_path, _agent=controleur("VERDICT: ACCEPTÉ\nok")
+    )
+    assert a["verdict"] == "accepte"  # accent normalisé
+    c = beecham._lancer_controleur(
+        "s", "d", "t", tmp_path, _agent=controleur("VERDICT: À CORRIGER\nrevois X")
+    )
+    assert c["verdict"] == "corriger"
+    rj = beecham._lancer_controleur(
+        "s", "d", "t", tmp_path, _agent=controleur("VERDICT: REJETÉ\nnon")
+    )
+    assert rj["verdict"] == "rejeter"
+    # piège incident : 1re ligne REJETÉ mais le corps cite « ACCEPTE » -> reste rejeter
+    piege = beecham._lancer_controleur(
+        "s",
+        "d",
+        "t",
+        tmp_path,
+        _agent=controleur("VERDICT: REJETÉ\nà l'inverse d'un 'VERDICT: ACCEPTE', non."),
+    )
+    assert piege["verdict"] == "rejeter"
 
 
 def test_lister_missions_recentes_d_abord(tmp_path):

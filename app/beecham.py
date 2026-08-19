@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+import unicodedata
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -436,24 +437,76 @@ def _harnais(worktree) -> dict:
     }
 
 
-def executer_mission(mission_id, role="developpeur", chemin=None, _agent=None) -> dict:
-    """Crée la branche, missionne un agent, passe le harnais, met la mission en `propose`."""
-    m = lire_mission(mission_id, chemin)
-    if not m:
-        return {"ok": False, "erreur": "mission_absente"}
-    agent = _agent or _lancer_agent  # injectable en test
-    try:
-        wt = _creer_worktree(m["branche"])
-    except Exception as e:
-        _maj(mission_id, chemin, statut="echec", journal=json.dumps([str(e)]))
-        return {"ok": False, "erreur": str(e)}
-    res = agent(role, m["consigne"], wt)
-    h = _harnais(wt)
-    journal = res.get("journal", []) + [f"harnais · tests: {h['tests_resume'] or '?'}"]
+def _normaliser_verdict(s: str) -> str:
+    """Majuscule SANS accents — « ACCEPTÉ » et « ACCEPTE » deviennent identiques (leçon incident)."""
+    return "".join(
+        c
+        for c in unicodedata.normalize("NFKD", s or "")
+        if unicodedata.category(c) != "Mn"
+    ).upper()
+
+
+def _lancer_controleur(scope, diff, tests_resume, worktree, _agent=None) -> dict:
+    """Revue adversariale ancrée sur le diff réel + les tests. TROIS verdicts (directive Alex) :
+    - « accepte » : correct, on fusionne ;
+    - « corriger » : récupérable, on renvoie au dev AVEC la correction précise (pas de gâchis) ;
+    - « rejeter » : approche mauvaise, on abandonne (inutile d'itérer).
+    Verdict lu sur la PREMIÈRE ligne non vide seule, insensible aux accents — jamais un substring
+    global (une citation du verdict opposé tromperait, cf. incident 2026-08-19)."""
+    agent = _agent or _lancer_agent
+    consigne = (
+        f"SCOPE de la mission : {scope}\n\n"
+        f"Résumé des tests (harnais déterministe) : {tests_resume}\n\n"
+        "Diff réel — seule source de vérité :\n```diff\n" + (diff or "") + "\n```\n\n"
+        "Relis de façon ADVERSARIALE : cherche ce qui casserait, tout écart au SCOPE (plus, moins, "
+        "autre chose), si les tests couvrent vraiment le chemin. Un signal vert ne prouve rien. "
+        "Vérifie aussi qu'aucune identité ni chemin de poste ne s'introduit.\n\n"
+        "PREMIÈRE LIGNE de ta réponse, EXACTEMENT l'un de :\n"
+        "  VERDICT: ACCEPTÉ     (correct — on fusionne)\n"
+        "  VERDICT: À CORRIGER  (récupérable — donne la correction PRÉCISE et actionnable)\n"
+        "  VERDICT: REJETÉ      (approche mauvaise — on abandonne)\n"
+        "Puis explique. Si À CORRIGER : sois précis, le dev repartira de ta consigne, pas de zéro."
+    )
+    res = agent("controleur", consigne, worktree)
+    texte = res.get("texte", "") if isinstance(res, dict) else ""
+    premiere = _normaliser_verdict(
+        next((li for li in texte.splitlines() if li.strip()), "")
+    )
+    if "ACCEPTE" in premiere:
+        verdict = "accepte"
+    elif "CORRIGER" in premiere:
+        verdict = "corriger"
+    else:
+        verdict = "rejeter"
+    return {"verdict": verdict, "raison": texte}
+
+
+def _fusion_locale(branche, worktree, mission_id) -> bool:
+    """Commit + merge --no-ff LOCAL (jamais de push). Message générique — jamais la consigne."""
+    _git(worktree, "add", "-A")
+    _git(
+        worktree,
+        "-c",
+        "user.name=beecham",
+        "-c",
+        "user.email=beecham@users.noreply.github.com",
+        "commit",
+        "-m",
+        f"beecham: mission {mission_id}",
+    )
+    r = _git(
+        RACINE, "merge", "--no-ff", "-m", f"beecham: mission {mission_id}", branche
+    )
+    _nettoyer(branche, worktree)
+    return r.returncode == 0
+
+
+def _clore(mission_id, chemin, statut, role, journal, h, resume) -> dict:
+    """État TERMINAL de la mission (jamais « propose ») : enregistre + trace au journal."""
     _maj(
         mission_id,
         chemin,
-        statut="propose",
+        statut=statut,
         agents_json=json.dumps([role], ensure_ascii=False),
         journal=json.dumps(journal, ensure_ascii=False),
         diff=h["diff"],
@@ -466,38 +519,139 @@ def executer_mission(mission_id, role="developpeur", chemin=None, _agent=None) -
             ensure_ascii=False,
         ),
     )
+    journal_ajouter(role, resume, statut)
     return {
-        "ok": True,
+        "ok": statut in ("livre", "valide"),
+        "statut": statut,
         "tests_ok": h["tests_ok"],
         "fichiers": h["fichiers"],
         "journal": journal,
     }
 
 
-def valider(mission_id, chemin=None) -> dict:
-    """Fusionne la branche de la mission dans main. (Redéploiement = étape séparée.)"""
+def executer_mission(
+    mission_id,
+    role="developpeur",
+    chemin=None,
+    _agent=None,
+    _controleur=None,
+    max_tours=2,
+) -> dict:
+    """Traite la mission AUTOMATIQUEMENT jusqu'à un état terminal — jamais de « propose » qui traîne :
+    - pas de diff de code (mission atelier) → `livre` ;
+    - code accepté par le contrôleur → fusion locale → `valide` ;
+    - code « à corriger » → renvoyé au dev avec la correction précise (borné à max_tours) ;
+    - code « rejeté » (approche mauvaise) → `rejete` (abandon, pas de gâchis d'itérations) ;
+    - encore « à corriger » au bout de max_tours → `bloque` (remonté à Alex)."""
     m = lire_mission(mission_id, chemin)
-    if not m or m["statut"] != "propose":
+    if not m:
+        return {"ok": False, "erreur": "mission_absente"}
+    agent = _agent or _lancer_agent
+    controle = _controleur or _lancer_controleur
+    try:
+        wt = _creer_worktree(m["branche"])
+    except Exception as e:
+        _maj(mission_id, chemin, statut="echec", journal=json.dumps([str(e)]))
+        return {"ok": False, "erreur": str(e)}
+
+    journal, consigne = [], m["consigne"]
+    for tour in range(1, max_tours + 1):
+        res = agent(role, consigne, wt)
+        journal += res.get("journal", [])
+        h = _harnais(wt)
+        journal.append(f"harnais · tests: {h['tests_resume'] or '?'}")
+
+        if not h["diff"].strip():  # mission atelier : rien à fusionner
+            _nettoyer(m["branche"], wt)
+            return _clore(
+                mission_id,
+                chemin,
+                "livre",
+                role,
+                journal,
+                h,
+                "livré (rien à fusionner)",
+            )
+
+        if not h["tests_ok"]:
+            verdict, raison = "corriger", f"tests en échec : {h['tests_resume']}"
+        else:
+            v = controle(m["consigne"], h["diff"], h["tests_resume"], wt)
+            verdict, raison = v["verdict"], v["raison"]
+            journal.append(f"controleur · {verdict}")
+
+        if verdict == "accepte":
+            ok = _fusion_locale(m["branche"], wt, mission_id)
+            return _clore(
+                mission_id,
+                chemin,
+                "valide" if ok else "echec",
+                role,
+                journal,
+                h,
+                "accepté + fusionné (local)" if ok else "conflit de fusion",
+            )
+        if verdict == "rejeter":
+            _nettoyer(m["branche"], wt)
+            return _clore(
+                mission_id,
+                chemin,
+                "rejete",
+                role,
+                journal,
+                h,
+                "rejeté (abandon) : " + raison[:80],
+            )
+        # « corriger » : on renvoie au dev avec la correction, sans repartir de zéro
+        if tour < max_tours:
+            consigne = (
+                m["consigne"]
+                + f"\n\n[CORRECTION — tour {tour + 1}] Le contrôleur demande : "
+                + raison[:800]
+                + "\nCorrige PRÉCISÉMENT ces points, ne repars pas de zéro."
+            )
+            journal.append(f"→ correction demandée (tour {tour + 1})")
+        else:
+            _maj(
+                mission_id,
+                chemin,
+                statut="bloque",
+                diff=h["diff"],
+                agents_json=json.dumps([role], ensure_ascii=False),
+                journal=json.dumps(journal, ensure_ascii=False),
+                tests_json=json.dumps(
+                    {
+                        "ok": h["tests_ok"],
+                        "resume": h["tests_resume"],
+                        "fichiers": h["fichiers"],
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+            journal_ajouter(role, m["consigne"][:50], "bloqué (à revoir par Alex)")
+            return {
+                "ok": False,
+                "statut": "bloque",
+                "journal": journal,
+                "raison": raison,
+            }
+    return {
+        "ok": False,
+        "statut": "echec",
+        "journal": journal,
+    }  # max_tours < 1 (garde-fou)
+
+
+def valider(mission_id, chemin=None) -> dict:
+    """Validation MANUELLE (rare) : Alex fusionne une mission `bloque` (ou `propose` héritée).
+    Le flux normal est automatique (executer_mission) — ceci n'est qu'un filet pour l'escalade."""
+    m = lire_mission(mission_id, chemin)
+    if not m or m["statut"] not in ("propose", "bloque"):
         return {"ok": False, "erreur": "statut_invalide"}
     wt = WORKTREES / m["branche"].replace("/", "_")
-    _git(wt, "add", "-A")
-    _git(
-        wt,
-        "-c",
-        "user.name=beecham",
-        "-c",
-        "user.email=beecham@users.noreply.github.com",
-        "commit",
-        "-m",
-        f"beecham: mission {mission_id}",
-    )
-    r = _git(
-        RACINE, "merge", "--no-ff", "-m", f"beecham: mission {mission_id}", m["branche"]
-    )
-    _nettoyer(m["branche"], wt)
-    ok = r.returncode == 0
+    ok = _fusion_locale(m["branche"], wt, mission_id)
     _maj(mission_id, chemin, statut="valide" if ok else "echec")
-    return {"ok": ok, "erreur": None if ok else r.stderr.strip()[:200]}
+    return {"ok": ok, "erreur": None if ok else "conflit de fusion"}
 
 
 def rejeter(mission_id, chemin=None) -> dict:
