@@ -246,3 +246,10 @@ button.cb:active{transform:translateY(0)}
 @media(max-width:640px){.poulsgrid{grid-template-columns:1fr}}
 .pouls-item{font-size:13px;color:var(--encre);padding:6px 0;border-bottom:1px solid var(--regle);line-height:1.35;
   display:flex;gap:8px;align-items:baseline}
+
+/* ===== Logo Monique (visage) dans l'en-tete ===== */
+.marque{display:flex;align-items:center;gap:9px}
+.logo-av{width:34px;height:34px;border-radius:50%;object-fit:cover;object-position:center 22%;
+  image-rendering:pixelated;border:1.5px solid var(--regle);flex:none}
+.wordmark{font-weight:800;font-size:23px;letter-spacing:-0.02em;line-height:1}
+.marque .date{margin-left:2px}

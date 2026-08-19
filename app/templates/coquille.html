@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monique</title>
 <link rel="icon" type="image/x-icon" href="/static/monique.ico">
-<link rel="apple-touch-icon" href="/static/avatars/secretaire.png">
-<link rel="stylesheet" href="/static/ohmie.css?v=5">
+<link rel="apple-touch-icon" href="/static/monique_touch.png">
+<link rel="stylesheet" href="/static/ohmie.css?v=6">
 <script src="/static/htmx.min.js"></script>
 </head>
 <body>
@@ -16,7 +16,11 @@
       <button id="menubtn" class="menubtn" aria-label="Ouvrir le menu des départements" aria-expanded="false">
         <span class="bars"><span></span><span></span><span></span></span>
       </button>
-      <div class="marque">Mon<span class="pt">ique</span><span class="date">{{ date }}</span></div>
+      <div class="marque">
+        <img class="logo-av" src="/static/monique.png" alt="Monique">
+        <span class="wordmark">Mon<span class="pt">ique</span></span>
+        <span class="date">{{ date }}</span>
+      </div>
     </div>
     <div class="moniquecard">
       <img class="mavatar" id="agentav" src="/static/avatars/secretaire.png" alt="">
@@ -51,9 +55,8 @@
           ("Comptable", "comptable.jpg", [("Relances", "/vue/relances")]),
         ]),
         ("Informatique", "#3f6d8a", [
-          ("Veilleur", "veilleur.jpg", [("Monitoring", "/vue/monitoring"), ("Coût", "/vue/usage")]),
           ("Développeur", "developpeur.jpg", [("Réglages", "/vue/reglages")]),
-          ("Documentaliste", "documentaliste.jpg", [("Fournisseurs", "/vue/fournisseurs")]),
+          ("Documentaliste", "documentaliste.jpg", [("Fournisseurs modèles IA", "/vue/fournisseurs")]),
         ]),
         ("Approvisionnement", "#d2691e", [
           ("Approvisionnement", "fournisseurs_materiel.jpg", [("Fournisseurs matériel", "/vue/fournisseurs-materiel")]),
@@ -62,7 +65,7 @@
           ("Technicien", "technicien.jpg", [("Planificateur", "/vue/planif")]),
         ]),
         ("Infra & Surveillance Système", "#557089", [
-          ("Veilleur", "veilleur.jpg", [("Système", "/vue/processus")]),
+          ("Veilleur", "veilleur.jpg", [("Monitoring", "/vue/monitoring"), ("Système", "/vue/processus"), ("Coût", "/vue/usage")]),
         ]),
         ("Recherche / Veille", "#2c8a8a", [
           ("Chercheur", "chercheur.jpg", [("Recherche", "/vue/recherche")]),
