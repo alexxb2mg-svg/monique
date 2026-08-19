@@ -1,6 +1,7 @@
 <div class="detail">
   <div class="dh"><span class="canal {{ item.source }}">{{ item.source }}</span>
     <span class="dexp">{{ item.apercu[:60] }}</span></div>
+  <p class="sous">Message reçu</p><div class="brouillon">{{ contenu_complet or item.apercu }}</div>
   {% if resultat_action and resultat_action.get('envoye_reellement') == false %}
     <p class="bandeau">Brouillon mis en file d'attente — mode test, rien n'est parti.</p>
   {% endif %}

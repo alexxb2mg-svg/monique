@@ -35,6 +35,41 @@ def test_detail_montre_brouillon(monkeypatch, tmp_path):
     assert r.status_code == 200 and "Bonjour" in r.text and "valider" in r.text
 
 
+def test_detail_montre_le_message_integral_pas_seulement_lapercu(monkeypatch):
+    # revue backlog Alex D-6 : « affiche des clés/identifiants, pas l'échange lui-même » —
+    # le détail doit rendre le texte COMPLET (lire_event), pas les 140/60 caractères de l'aperçu.
+    message_complet = ("x" * 150) + "FIN DU MESSAGE COMPLET"
+    monkeypatch.setattr(
+        boite,
+        "lire_boite",
+        lambda **k: [
+            {
+                "id": 42,
+                "source": "gmail",
+                "apercu": "Question devis",
+                "timestamp": "…",
+                "traite": False,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        boite,
+        "lire_event",
+        lambda event_id, chemin=None: {
+            "id": 42,
+            "source": "gmail",
+            "contenu": message_complet,
+            "status": "nouveau",
+            "timestamp": "…",
+            "traite": False,
+        },
+    )
+    monkeypatch.setattr(overlays, "lire_brouillon", lambda eid, chemin=None: None)
+    r = TestClient(serveur.app).get("/boite/42")
+    assert r.status_code == 200
+    assert "FIN DU MESSAGE COMPLET" in r.text
+
+
 def test_detail_sans_brouillon_propose_amorcer(monkeypatch):
     monkeypatch.setattr(
         boite,
