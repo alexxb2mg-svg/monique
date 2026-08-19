@@ -23,16 +23,21 @@
   </header>
 
   <nav class="onglets" id="onglets">
+    <span class="sous">Direction</span>
+    <button class="onglet" hx-get="/vue/beecham" hx-target="#vue" data-av="orchestrateur.jpg" data-nom="Beecham">Beecham</button>
+    <span class="sous">Secrétariat</span>
     <button class="onglet actif" hx-get="/vue/jour" hx-target="#vue" data-av="secretaire.png" data-nom="Secrétaire">Aujourd'hui</button>
     <button class="onglet" hx-get="/vue/boite" hx-target="#vue" data-av="secretaire.png" data-nom="Secrétaire">La boîte</button>
     <button class="onglet" hx-get="/vue/faire" hx-target="#vue" data-av="maitre_oeuvre.jpg" data-nom="Maître d'œuvre">À faire</button>
+    <span class="sous">Comptabilité</span>
     <button class="onglet" hx-get="/vue/relances" hx-target="#vue" data-av="comptable.jpg" data-nom="Comptable">Relances</button>
+    <span class="sous">Informatique</span>
     <button class="onglet" hx-get="/vue/monitoring" hx-target="#vue" data-av="veilleur.jpg" data-nom="Veilleur">Monitoring</button>
     <button class="onglet" hx-get="/vue/reglages" hx-target="#vue" data-av="developpeur.jpg" data-nom="Développeur">Réglages</button>
     <button class="onglet" hx-get="/vue/planif" hx-target="#vue" data-av="technicien.jpg" data-nom="Technicien">Planificateur</button>
     <button class="onglet" hx-get="/vue/fournisseurs" hx-target="#vue" data-av="documentaliste.jpg" data-nom="Documentaliste">Fournisseurs</button>
+    <span class="sous">La brigade</span>
     <button class="onglet" hx-get="/vue/agents" hx-target="#vue" data-av="orchestrateur.jpg" data-nom="La brigade">Agents</button>
-    <button class="onglet" hx-get="/vue/beecham" hx-target="#vue" data-av="orchestrateur.jpg" data-nom="Beecham">Beecham</button>
   </nav>
 
   <section id="vue">{% include "vue_jour.html" %}</section>
