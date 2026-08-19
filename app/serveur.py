@@ -514,7 +514,12 @@ def vue_beecham(request: Request):
 @app.get("/vue/usage", response_class=HTMLResponse)
 def vue_usage_html(request: Request):
     return tpl.TemplateResponse(
-        request, "vue_usage.html", {"usage": vue_usage.contexte_usage()}
+        request,
+        "vue_usage.html",
+        {
+            "usage": vue_usage.contexte_usage(),
+            "previsionnel": vue_usage.previsionnel_multi_fournisseurs(),
+        },
     )
 
 

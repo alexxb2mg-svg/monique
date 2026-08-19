@@ -1,3 +1,4 @@
+import catalogue_prix
 import entrepot
 import usage
 import vue_usage
@@ -84,3 +85,31 @@ def test_fichier_absent_fail_soft(tmp_path):
     ctx = vue_usage.contexte_usage(db)
 
     assert ctx == []
+
+
+def test_previsionnel_multi_fournisseurs_calcule_sur_le_total_global(tmp_path):
+    db = _db(tmp_path)
+    usage.compter(
+        "secretaire", "sonnet", "claude_cli", "brouillon", 100, 50,
+        cost_status="included", estimated_cost_usd=0.0, chemin=db,
+    )
+    usage.compter(
+        "beecham", "sonnet", "claude_cli", "mission", 200, 80,
+        cost_status="estimated", estimated_cost_usd=1.5, chemin=db,
+    )
+
+    previsionnel = vue_usage.previsionnel_multi_fournisseurs(db)
+
+    attendu = catalogue_prix.comparer_fournisseurs(300, 130)
+    assert previsionnel == attendu
+    assert previsionnel  # non vide
+    assert [c["cout_usd"] for c in previsionnel] == sorted(c["cout_usd"] for c in previsionnel)
+
+
+def test_previsionnel_vide_si_aucun_usage(tmp_path):
+    db = _db(tmp_path)
+
+    assert vue_usage.previsionnel_multi_fournisseurs(db) == []
+
+    db_absent = str(tmp_path / "n_existe_pas.db")
+    assert vue_usage.previsionnel_multi_fournisseurs(db_absent) == []
