@@ -12,7 +12,12 @@ def test_slugs_et_routes_uniques():
     slugs = [d["slug"] for d in nav.DEPARTEMENTS]
     assert len(slugs) == len(set(slugs))
 
-    routes = [o["route"] for d in nav.DEPARTEMENTS for o in d["onglets"]]
+    routes = [
+        o["route"]
+        for d in nav.DEPARTEMENTS
+        for p in d["personas"]
+        for o in p["onglets"]
+    ]
     assert routes  # au moins un onglet quelque part
     assert len(routes) == len(set(routes))
 
@@ -22,6 +27,11 @@ def test_chaque_route_est_declaree_dans_serveur():
     texte = serveur_py.read_text(encoding="utf-8")
     routes_declarees = set(re.findall(r'@app\.get\("(/vue/[^"]+)"', texte))
 
-    routes_nav = {o["route"] for d in nav.DEPARTEMENTS for o in d["onglets"]}
+    routes_nav = {
+        o["route"]
+        for d in nav.DEPARTEMENTS
+        for p in d["personas"]
+        for o in p["onglets"]
+    }
     manquantes = routes_nav - routes_declarees
     assert not manquantes, f"routes absentes de serveur.py : {manquantes}"
