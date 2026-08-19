@@ -88,30 +88,65 @@ def voie_libre():
         time.sleep(5)
 
 
+def _echecs_recents(n=6):
+    """Sert à Beecham ses derniers ÉCHECS avec le rapport du réviseur — la MATIÈRE pour diagnostiquer
+    au lieu de re-dispatcher à l'aveugle. Lu depuis le journal d'incidents (déjà écrit par la boucle),
+    croisé avec le sujet de la mission. On donne l'info ; on ne dicte pas quoi en penser."""
+    try:
+        lignes = INCIDENTS.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return ""
+    rejets = []
+    for li in reversed(lignes):
+        try:
+            r = json.loads(li)
+        except Exception:
+            continue
+        if r.get("type") in ("rejet_controleur", "tests_rouges", "moteur_echec", "reprise_ko"):
+            rejets.append(r)
+        if len(rejets) >= n:
+            break
+    if not rejets:
+        return "Aucun échec récent à analyser."
+    try:
+        sujets = {m["id"]: (m.get("consigne") or "")[:80] for m in beecham.lister_missions(limit=40)}
+    except Exception:
+        sujets = {}
+    out = []
+    for r in rejets:
+        suj = sujets.get(r.get("mid"), "(sujet inconnu)")
+        out.append(f"- [{r.get('type')}] {suj} → {str(r.get('detail'))[:280]}")
+    return "\n".join(out)
+
+
 def planifier(numero):
+    echecs = _echecs_recents()
     consigne = (
-        "Tu es Beecham, tu diriges la brigade en autonomie. Commence par un BREF ÉTAT DES LIEUX "
-        "(state du store/appli, avancées récentes du journal, orientation en cours), puis DÉCIDE.\n"
-        "Lis le CAP en tête de " + f"{AT}/demandes_alex.md : le BUT est le métier, MAIS la PHASE "
-        "ACTUELLE est la CONSTRUCTION → priorité d'exécution du moment = CODE : le HARNAIS (la brigade "
-        "elle-même : boucle, contrôle, mesure), le FRONT-END (lisible, rapide, par département), le "
-        "BACK-END, l'architecture. On calibre l'outil en machine de guerre ; le métier viendra après. "
-        "Lis aussi " + f"{AT}/DIRECTIVES.md, {AT}/plan.md, {AT}/journal.md, et le code "
-        "(app/serveur.py, app/templates/, app/beecham.py, app/roles.py). Une grosse décision "
-        "d'architecture/stack se RECHERCHE et se PROPOSE à Alex, elle ne se code pas à l'aveugle. "
-        "Avant de dispatcher, demande-toi si la brigade a les capacités (yeux, savoir, outils) — sinon "
-        "comble le manque d'abord (ex. agent vision, banc de mesure de latence).\n\n"
-        "Lis AUSSI " + f"{AT}/decisions_direction.md : ce sont TES décisions du conseil de "
-        "Direction, APPLIQUE-LES. Notamment : (a) VÉRIFIE le scope contre l'état RÉEL du fichier cible "
-        "avant de rédiger une consigne (lis le fichier, pas juste le backlog) ; (b) aucune mission déjà "
-        "rejetée re-dispatchée à l'identique sans citer le motif du rejet précédent + ce qui change.\n\n"
-        f"Planifie la VAGUE {numero} : jusqu'à {CONCURRENCE} micro-missions PETITES et STRICTEMENT "
-        "INDÉPENDANTES (fichiers différents — deux missions qui partagent un fichier NE PEUVENT PAS "
-        "tourner dans la même vague). Pour CHAQUE mission, DÉCLARE la liste EXACTE des fichiers "
-        "qu'elle va toucher. Stack existante (FastAPI+HTMX+Jinja). Backlog épuisé => file VIDE [].\n\n"
-        f"Écris SEULEMENT {AT}/file_attente.json : "
-        '[{"agent":"developpeur","consigne":"…précise, scope vérifié, fichier+test…",'
-        '"fichiers":["app/x.py","app/tests/test_x.py"]}, …]. L\'agent ne verra QUE sa consigne.'
+        "Tu es Beecham, le directeur de la brigade. Tu es intelligent : tu ne dispatches pas à "
+        "l'aveugle, tu réfléchis d'abord comme un chef de projet, avec la matière ci-dessous, puis "
+        "tu décides à ta façon. Ce qui suit est une démarche et des données, pas une checklist à cocher.\n\n"
+        "ÉTAT DES LIEUX. Où en est-on vraiment ? Appuie-toi sur "
+        + f"{AT}/decisions_direction.md (TES décisions passées = ton CAP, tiens-t'y et construis dessus), "
+        + f"{AT}/plan.md, {AT}/journal.md, le CAP en tête de {AT}/demandes_alex.md, {AT}/DIRECTIVES.md, "
+        "et le CODE RÉEL (app/serveur.py, app/templates/, app/harnais/, app/beecham.py). PHASE ACTUELLE = "
+        "CONSTRUCTION de l'outil (harnais, front par département, back, archi) ; le métier viendra après.\n\n"
+        "APPRENDS DE CE QUI A RATÉ (rapports réels du réviseur) :\n" + echecs + "\n"
+        "Demande-toi honnêtement, pour chacun : pourquoi ça a VRAIMENT échoué — sujet infaisable, "
+        "approche mauvaise, test mal conçu, cause pas comprise ? Ne relance un sujet déjà raté QUE si tu "
+        "as compris la cause ET changes d'approche ; sinon diagnostique-le d'abord (mission de lecture "
+        "seule) ou abandonne-le. S'acharner à l'identique, c'est se cogner au mur.\n\n"
+        "DÉLIBÈRE comme un humain le ferait : pourquoi ce sujet maintenant, comment l'atteindre "
+        "proprement, QUI (quel persona) est le bon, quand. Envisage plusieurs pistes, pèse-les, TRANCHE, "
+        "et sache pourquoi tu tranches ainsi. Une grosse décision d'archi se RECHERCHE et se PROPOSE à "
+        "Alex, jamais codée à l'aveugle.\n\n"
+        "GRAVE TA DÉCISION : ajoute UNE ligne datée à " + f"{AT}/decisions_direction.md disant ce que tu "
+        "décides pour cette vague et POURQUOI — c'est ainsi que tu tiens un cap d'une vague à l'autre.\n\n"
+        f"PUIS DISPATCHE la VAGUE {numero}. Écris SEULEMENT {AT}/file_attente.json : jusqu'à {CONCURRENCE} micro-missions "
+        "PETITES et STRICTEMENT INDÉPENDANTES (fichiers DIFFÉRENTS — deux missions partageant un fichier "
+        "ne tournent pas ensemble). Pour CHAQUE : consigne précise, scope VÉRIFIÉ contre l'état réel du "
+        "fichier (lis-le), liste EXACTE des fichiers touchés. Backlog épuisé => file VIDE [].\n"
+        'Format : [{"agent":"developpeur","consigne":"…","fichiers":["app/x.py","app/tests/test_x.py"]}, …]. '
+        "L'agent ne verra QUE sa consigne."
     )
     mid = beecham.demarrer_mission(consigne)
     beecham.executer_mission(mid, role="chef")
