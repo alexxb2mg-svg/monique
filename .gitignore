@@ -46,3 +46,6 @@ Thumbs.db
 
 # Atelier partagé des agents (données de travail vivantes)
 atelier/
+
+# lanceurs locaux machine-specifiques (contiennent un chemin de poste)
+app/lancer_monique.vbs
