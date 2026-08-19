@@ -12,3 +12,11 @@
 {% else %}
   <p class="vide">Aucun usage enregistré.</p>
 {% endfor %}
+
+<div class="besoin-titre">Comparatif fournisseurs (volume actuel)</div>
+{% for c in previsionnel %}
+  <p class="sous">{{ c.fournisseur }} / {{ c.modele }} — {{ "%.4f"|format(c.cout_usd) }} $</p>
+{% endfor %}
+{% if not previsionnel %}
+  <p class="vide">Pas encore assez d'usage pour comparer.</p>
+{% endif %}

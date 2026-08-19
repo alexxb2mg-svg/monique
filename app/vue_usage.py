@@ -1,5 +1,6 @@
 import sqlite3
 
+import catalogue_prix
 from config import chemin_ecriture
 
 
@@ -62,3 +63,30 @@ def contexte_usage(chemin=None) -> list[dict]:
 
     resultat.sort(key=lambda d: d["agent"])
     return resultat
+
+
+def previsionnel_multi_fournisseurs(chemin=None) -> list[dict]:
+    """Comparatif de coût (D-3) : pour le volume TOTAL de tokens (tous agents
+    confondus), le coût de chaque modèle de chaque fournisseur du catalogue,
+    trié du moins cher au plus cher. Lecture seule, fail-soft — même patron
+    que contexte_usage() ci-dessus : store absent ou toute exception => [].
+    Ne recalcule pas le coût : réutilise catalogue_prix.comparer_fournisseurs().
+    """
+    cible = chemin or chemin_ecriture()
+    try:
+        con = sqlite3.connect(f"file:{cible}?mode=ro", uri=True, timeout=8)
+        try:
+            ligne = con.execute(
+                "SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0) "
+                "FROM secw_model_usage"
+            ).fetchone()
+        finally:
+            con.close()
+    except Exception:
+        return []
+
+    total_input, total_output = ligne
+    if not total_input and not total_output:
+        return []
+
+    return catalogue_prix.comparer_fournisseurs(total_input, total_output)
