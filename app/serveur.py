@@ -26,6 +26,7 @@ import config
 import digest as digest_module
 import entrepot
 import fournisseurs
+import fournisseurs_materiel
 import monitoring
 import orchestrateur
 import overlays
@@ -237,6 +238,17 @@ def maj_reglages_chercheur(
     parametres.definir("chercheur.canaux", canaux)
     return tpl.TemplateResponse(
         request, "vue_reglages.html", _reglages_ctx(enregistre_chercheur=True)
+    )
+
+
+def _fournisseurs_materiel_ctx():
+    return {"fournisseurs": fournisseurs_materiel.lister_fournisseurs()}
+
+
+@app.get("/vue/fournisseurs-materiel", response_class=HTMLResponse)
+def vue_fournisseurs_materiel(request: Request):
+    return tpl.TemplateResponse(
+        request, "vue_fournisseurs_materiel.html", _fournisseurs_materiel_ctx()
     )
 
 
