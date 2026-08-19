@@ -42,6 +42,22 @@ def test_maj_reglages_appelle_definir_sans_ecrire_reel(monkeypatch):
     ) in vus
 
 
+def test_maj_reglages_chercheur_appelle_definir_sans_ecrire_reel(monkeypatch):
+    vus = []
+    monkeypatch.setattr(
+        parametres, "definir", lambda cle, val, chemin=None: vus.append((cle, val))
+    )
+    monkeypatch.setattr(config, "cfg_get", lambda s, c, d=None: d)
+    r = _client().post(
+        "/reglages/chercheur", data={"veille_freq": "1x/jour", "canaux": "web"}
+    )
+    assert r.status_code == 200
+    assert vus == [
+        ("chercheur.veille_freq", "1x/jour"),
+        ("chercheur.canaux", "web"),
+    ]
+
+
 # --- Planificateur --------------------------------------------------------------------
 
 

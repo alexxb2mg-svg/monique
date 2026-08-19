@@ -180,12 +180,15 @@ def vue_monitoring(request: Request):
 # --- Services transverses (Phase 3, Batch C) : Réglages / Planificateur / Fournisseurs -----------
 
 
-def _reglages_ctx(enregistre=False):
+def _reglages_ctx(enregistre=False, enregistre_chercheur=False):
     return {
         "veille_freq": config.cfg_get("secretaire", "veille_freq", "2x/jour"),
         "canaux": config.cfg_get("secretaire", "canaux", "mail,wa,sms"),
         "options_freq": ["1x/jour", "2x/jour", "3x/jour", "toutes les heures"],
         "enregistre": enregistre,
+        "chercheur_veille_freq": config.cfg_get("chercheur", "veille_freq", "1x/jour"),
+        "chercheur_canaux": config.cfg_get("chercheur", "canaux", "web"),
+        "enregistre_chercheur": enregistre_chercheur,
     }
 
 
@@ -204,6 +207,17 @@ def maj_reglages(
     parametres.definir("secretaire.canaux", canaux)
     return tpl.TemplateResponse(
         request, "vue_reglages.html", _reglages_ctx(enregistre=True)
+    )
+
+
+@app.post("/reglages/chercheur", response_class=HTMLResponse)
+def maj_reglages_chercheur(
+    request: Request, veille_freq: str = Form(...), canaux: str = Form(...)
+):
+    parametres.definir("chercheur.veille_freq", veille_freq)
+    parametres.definir("chercheur.canaux", canaux)
+    return tpl.TemplateResponse(
+        request, "vue_reglages.html", _reglages_ctx(enregistre_chercheur=True)
     )
 
 
