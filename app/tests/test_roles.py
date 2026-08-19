@@ -75,3 +75,12 @@ def test_chef_dev_visible_dans_annuaire_et_departement_informatique():
     assert "chef_dev" in carte
     assert roles.parse_role("chef_dev")["departement"] == "Informatique"
     assert "chef_dev" in roles.carte_departements()["Informatique"]
+
+
+def test_vision_visible_dans_annuaire_et_departement_qualite():
+    # D-12 étape 1 : agents/vision/ROLE.md existe dans le VRAI dossier agents/ du dépôt
+    # (pas de tmp_path/monkeypatch ici, comme carte_agents() en production).
+    carte = roles.carte_agents()
+    assert "vision" in carte
+    assert roles.parse_role("vision")["departement"] == "Qualité"
+    assert "vision" in roles.carte_departements()["Qualité"]
