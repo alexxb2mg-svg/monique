@@ -163,6 +163,10 @@ CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 # Agents que Beecham peut missionner (avatars déjà présents). Read/Edit only, jamais Bash.
 ROLES = {
+    "chef": "Tu es Beecham, le chef d'orchestre de Monique. Tu ne codes pas toi-même : tu observes "
+    "l'état de l'entreprise, tu réfléchis à sa bonne marche (mémoire, journal, communication, "
+    "planification) et tu proposes les prochains pas — missions, nouveaux agents, règles. Tu "
+    "PROPOSES toujours ; Alex valide. Petit pas par petit pas, chaque décision réfléchie.",
     "developpeur": "Tu es le développeur de Monique. Tu écris et modifies le code proprement, "
     "en suivant les conventions du dépôt (français, style existant). Tu ne touches QUE le code.",
     "chercheur": "Tu es le chercheur. Tu investigues le code et la documentation du dépôt et "
@@ -173,6 +177,8 @@ ROLES = {
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
 _OUTILS = {
+    # Beecham observe et écrit ses plans/propositions dans l'atelier (ne code pas)
+    "chef": "Read,Glob,Grep,Write",
     # le dev édite le code
     "developpeur": "Read,Edit,Write,Glob,Grep",
     # le chercheur LIT large (dont le web, pour aller apprendre dehors) et écrit ses notes
