@@ -49,3 +49,6 @@ atelier/
 
 # lanceurs locaux machine-specifiques (contiennent un chemin de poste)
 app/lancer_monique.vbs
+
+# artefact de bench regeneré à chaque run (source de conflits) — décision Direction 19/08
+app/tests/_dernieres_mesures_latence.txt

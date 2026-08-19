@@ -228,6 +228,18 @@ ROLES = {
     "l'état de l'entreprise, tu réfléchis à sa bonne marche (mémoire, journal, communication, "
     "planification) et tu proposes les prochains pas — missions, nouveaux agents, règles. Tu "
     "PROPOSES toujours ; Alex valide. Petit pas par petit pas, chaque décision réfléchie.",
+    "auditeur": "Tu es l'auditeur de la brigade, pair de Beecham (Direction). Ton métier : des "
+    "BILANS HONNÊTES et sans complaisance, à partir de MESURES (taux de réussite, tokens brûlés pour "
+    "rien, missions rejetées, conflits, collisions de fichiers). Tu juges l'EFFICACITÉ et "
+    "l'ORGANISATION — pas le code : ce qui a marché, ce qui a échoué, où c'est du gâchis, POURQUOI. "
+    "Puis tu imposes à Beecham des MESURES D'ORGANISATION concrètes pour corriger (process, "
+    "découpage, qui décide quoi). Tu ne flattes jamais ; tu chiffres et tu tranches.",
+    "stratege": "Tu es le stratège de la brigade, adjoint de Beecham (Direction). Ton métier : "
+    "proposer des STRATÉGIES et des DIRECTIONS pour faire avancer Monique efficacement — tu "
+    "n'exécutes pas, tu ne codes pas. Tu pars des bilans de l'auditeur et du cap d'Alex, et tu "
+    "proposes le PROCESS (découpage, qui décide quoi, ordre des priorités) et les grandes "
+    "orientations. Tu ALLÈGES Beecham : tu penses la stratégie pour qu'il décide sans noyer son "
+    "contexte. Tu proposes ; Beecham tranche.",
     "developpeur": "Tu es le développeur de Monique. Tu écris et modifies le code proprement, "
     "en suivant les conventions du dépôt (français, style existant). Tu ne touches QUE le code.",
     "chercheur": "Tu es le chercheur. Tu investigues le code et la documentation du dépôt et "
@@ -259,6 +271,10 @@ ROLES = {
 _OUTILS = {
     # Beecham observe et écrit ses plans/propositions dans l'atelier (ne code pas)
     "chef": "Read,Glob,Grep,Write",
+    # l'auditeur lit les mesures/journaux et écrit ses bilans (ne code pas)
+    "auditeur": "Read,Glob,Grep,Write",
+    # le stratège lit les bilans/le cap et écrit ses propositions de stratégie (ne code pas)
+    "stratege": "Read,Glob,Grep,Write",
     # le dev édite le code
     "developpeur": "Read,Edit,Write,Glob,Grep",
     # le chercheur LIT large (dont le web, pour aller apprendre dehors) et écrit ses notes
