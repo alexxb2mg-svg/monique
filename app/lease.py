@@ -18,6 +18,8 @@ def _process_start(pid):
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",  # sortie PowerShell parfois en OEM (cp850) : ne jamais crasher le reader
             timeout=6,
             creationflags=0x08000000,
         ).stdout.strip()
