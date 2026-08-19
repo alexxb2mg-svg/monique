@@ -28,17 +28,27 @@ def _mission_propose(mid="m1"):
 # --- GET /vue/beecham -------------------------------------------------------------------
 
 
-def test_vue_beecham_affiche_mission_proposee(monkeypatch):
+def test_vue_beecham_affiche_le_travail_de_l_agent(monkeypatch):
+    # salle des machines : le flux d'actions de l'agent est TOUJOURS visible (plus seulement en 'propose')
     monkeypatch.setattr(
         beecham, "lister_missions", lambda chemin=None, limit=20: [_mission_propose()]
     )
     r = _client().get("/vue/beecham")
     assert r.status_code == 200
-    assert "ajouter un module bonjour" in r.text
-    assert "propose" in r.text
-    assert "1 passed" in r.text
-    assert "VALEUR = 42" in r.text
-    # boutons de décision présents
+    assert "ajouter un module bonjour" in r.text  # la consigne
+    assert "developpeur" in r.text  # l'agent nommé
+    assert "Ce que l'agent a fait" in r.text  # le flux d'actions
+    assert "bonjour.py" in r.text  # une action du journal
+    assert "1 passed" in r.text  # les tests
+    assert "VALEUR = 42" in r.text  # le diff
+
+
+def test_vue_beecham_bloque_montre_les_boutons_escalade(monkeypatch):
+    # nouveau modèle : le contrôleur tranche tout seul ; seul un 'bloque' remonte à Alex avec des boutons
+    m = _mission_propose()
+    m["statut"] = "bloque"
+    monkeypatch.setattr(beecham, "lister_missions", lambda chemin=None, limit=20: [m])
+    r = _client().get("/vue/beecham")
     assert 'hx-post="/beecham/m1/valider"' in r.text
     assert 'hx-post="/beecham/m1/rejeter"' in r.text
 
@@ -64,8 +74,8 @@ def test_vue_beecham_en_cours_declenche_le_poll(monkeypatch):
     m["statut"] = "en_cours"
     monkeypatch.setattr(beecham, "lister_missions", lambda chemin=None, limit=20: [m])
     r = _client().get("/vue/beecham")
-    assert "en cours" in r.text
-    assert 'hx-trigger="every 4s"' in r.text  # auto-refresh htmx
+    assert "au travail" in r.text
+    assert 'hx-trigger="every 3s"' in r.text  # auto-refresh htmx
 
 
 # --- POST /beecham/mission --------------------------------------------------------------
