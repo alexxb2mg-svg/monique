@@ -331,7 +331,24 @@ def _lancer_agent(role, consigne, worktree) -> dict:
     Renvoie {ok, journal:[actions], texte}. Mockable en test."""
     systeme = ROLES.get(role, ROLES["developpeur"])
     outils = _OUTILS.get(role, _OUTILS["developpeur"])
+    # Contexte de la brigade : plan.md + mémoire du rôle, en tête du prompt. Fail-soft (même
+    # principe que journal_ajouter) : fichier absent/vide ou erreur de lecture => on ignore
+    # silencieusement ce bloc, la mission ne doit JAMAIS échouer pour ça.
+    contexte = ""
+    try:
+        plan_txt = PLAN.read_text(encoding="utf-8")
+        if plan_txt:
+            contexte += f"# Contexte de la brigade (plan.md)\n{plan_txt}\n\n"
+    except OSError:
+        pass
+    try:
+        memoire_txt = chemin_memoire(role).read_text(encoding="utf-8")
+        if memoire_txt:
+            contexte += f"# Mémoire de ton rôle\n{memoire_txt}\n\n"
+    except OSError:
+        pass
     prompt = (
+        f"{contexte}"
         f"{consigne}\n\n"
         "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
         "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
