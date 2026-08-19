@@ -437,16 +437,20 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
             "--resume",
             reprendre,
         ]  # reprend la session -> mémoire de travail + cache conservés
+    # Popen (pas run) pour capturer le PID et INSCRIRE la session claude au superviseur (D-16) :
+    # elle apparaît au tableau des process, et en cas de timeout on coupe TOUT son sous-arbre.
+    import superviseur
+
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             cwd=str(worktree),
             env=env,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=1800,
             creationflags=CREATE_NO_WINDOW,
         )
     except Exception as e:
@@ -456,8 +460,37 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
             "texte": "",
             "session_id": None,
         }
+    rid_sup = None
+    try:
+        rid_sup = superviseur.enregistrer(
+            proc.pid,
+            nom=f"claude:{role}",
+            proprietaire="beecham",
+            but=(consigne or "")[:70],
+            ppid=os.getpid(),
+        )
+    except Exception:
+        pass
+    try:
+        stdout, _ = proc.communicate(timeout=1800)
+        rc = proc.returncode
+    except subprocess.TimeoutExpired:
+        try:
+            superviseur.tuer(
+                rid_sup
+            ) if rid_sup else proc.kill()  # coupe l'arbre claude entier
+        except Exception:
+            proc.kill()
+        stdout, _ = proc.communicate()
+        rc = -1
+    finally:
+        if rid_sup:
+            try:
+                superviseur.finir(rid_sup)
+            except Exception:
+                pass
     journal, texte, session_id = [], "", None
-    for ligne in (proc.stdout or "").splitlines():
+    for ligne in (stdout or "").splitlines():
         try:
             ev = json.loads(ligne)
         except Exception:
@@ -482,7 +515,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
         elif ev.get("type") == "result":
             texte = ev.get("result", texte)
     return {
-        "ok": proc.returncode == 0,
+        "ok": rc == 0,
         "journal": journal,
         "texte": texte,
         "session_id": session_id,

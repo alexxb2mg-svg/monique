@@ -293,20 +293,25 @@ def test_chemin_memoire_cree_le_fichier_avec_en_tete(tmp_path, monkeypatch):
     assert "chercheur" in chemin.read_text(encoding="utf-8")
 
 
-def _subprocess_run_capture(appels):
-    """Remplace beecham.subprocess.run : capture `cmd` sans lancer de vrai process."""
+def _subprocess_popen_capture(appels):
+    """Remplace beecham.subprocess.Popen : capture `cmd` sans lancer de vrai process."""
 
-    def faux_run(cmd, **kwargs):
+    def faux_popen(cmd, **kwargs):
         appels.append(cmd)
 
         class FauxProc:
+            pid = 424242
             returncode = 0
-            stdout = ""
-            stderr = ""
+
+            def communicate(self, timeout=None):
+                return ("", "")
+
+            def kill(self):
+                pass
 
         return FauxProc()
 
-    return faux_run
+    return faux_popen
 
 
 def test_lancer_agent_injecte_plan_et_memoire(tmp_path, monkeypatch):
@@ -319,8 +324,12 @@ def test_lancer_agent_injecte_plan_et_memoire(tmp_path, monkeypatch):
         "MEMOIRE-CONNUE : piège déjà rencontré Y\n", encoding="utf-8"
     )
 
+    import superviseur
+
+    monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
+    monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
     appels = []
-    monkeypatch.setattr(beecham.subprocess, "run", _subprocess_run_capture(appels))
+    monkeypatch.setattr(beecham.subprocess, "Popen", _subprocess_popen_capture(appels))
 
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 
@@ -337,8 +346,12 @@ def test_lancer_agent_sans_plan_ni_memoire_ne_casse_pas(tmp_path, monkeypatch):
     _atelier_isole(tmp_path, monkeypatch)
     # aucun atelier écrit au préalable : plan.md et memoire/developpeur.md n'existent pas
 
+    import superviseur
+
+    monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
+    monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
     appels = []
-    monkeypatch.setattr(beecham.subprocess, "run", _subprocess_run_capture(appels))
+    monkeypatch.setattr(beecham.subprocess, "Popen", _subprocess_popen_capture(appels))
 
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 

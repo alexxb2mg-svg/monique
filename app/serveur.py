@@ -6,6 +6,7 @@ bascule n'est pas décidée).
 """
 
 import json
+import os
 import threading
 from contextlib import asynccontextmanager
 from datetime import date
@@ -33,6 +34,7 @@ import relances
 import roles
 import secretaire_actions
 import store
+import superviseur
 import vue_missions
 import vue_usage
 
@@ -54,6 +56,19 @@ async def lifespan(app):
     # Fail-soft : un hoquet d'init ne doit pas empêcher de servir (dégradé mais debout).
     try:
         entrepot.init_fondations()  # chemin_ecriture() : shadow en test, réel en prod
+    except Exception:
+        pass
+    # Superviseur (D-16) : au boot on RÉCONCILIE (nettoie les records morts des runs précédents +
+    # signale les orphelins vivants) et on INSCRIT le serveur lui-même — pour qu'il soit au tableau
+    # et coupable. Fail-soft : jamais bloquer le démarrage pour ça.
+    try:
+        superviseur.balayer()
+        superviseur.enregistrer(
+            os.getpid(),
+            nom="serveur",
+            proprietaire="monique",
+            but="serveur FastAPI :8790",
+        )
     except Exception:
         pass
     yield
@@ -392,7 +407,9 @@ def _decoder_missions(missions):
             d["agents"] = json.loads(d.get("agents_json") or "[]")
         except (TypeError, ValueError):
             d["agents"] = []
-        d["statut_libelle"] = LIBELLES_STATUT.get(d.get("statut"), (d.get("statut") or "").capitalize())
+        d["statut_libelle"] = LIBELLES_STATUT.get(
+            d.get("statut"), (d.get("statut") or "").capitalize()
+        )
         out.append(d)
     return out
 
@@ -416,6 +433,29 @@ def _beecham_ctx():
     }
 
 
+def _processus_ctx():
+    return {"procs": superviseur.etat(), "orphelins": superviseur.orphelins_vivants()}
+
+
+@app.get("/vue/processus", response_class=HTMLResponse)
+def vue_processus(request: Request):
+    return tpl.TemplateResponse(request, "vue_processus.html", _processus_ctx())
+
+
+@app.post("/processus/balayer", response_class=HTMLResponse)
+def balayer_processus(request: Request):
+    superviseur.balayer(
+        auto_tuer=True
+    )  # nettoie les morts + COUPE les orphelins vivants
+    return tpl.TemplateResponse(request, "vue_processus.html", _processus_ctx())
+
+
+@app.post("/processus/{rid}/tuer", response_class=HTMLResponse)
+def tuer_processus(request: Request, rid: str):
+    superviseur.tuer(rid)  # coupe ce process + tout son sous-arbre
+    return tpl.TemplateResponse(request, "vue_processus.html", _processus_ctx())
+
+
 @app.get("/vue/beecham", response_class=HTMLResponse)
 def vue_beecham(request: Request):
     return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
@@ -431,13 +471,17 @@ def missions_actives():
 @app.get("/vue/missions/actives", response_class=HTMLResponse)
 def vue_missions_actives_html(request: Request):
     return tpl.TemplateResponse(
-        request, "vue_missions_actives.html", {"missions": vue_missions.contexte_missions_actives()}
+        request,
+        "vue_missions_actives.html",
+        {"missions": vue_missions.contexte_missions_actives()},
     )
 
 
 @app.get("/vue/usage", response_class=HTMLResponse)
 def vue_usage_html(request: Request):
-    return tpl.TemplateResponse(request, "vue_usage.html", {"usage": vue_usage.contexte_usage()})
+    return tpl.TemplateResponse(
+        request, "vue_usage.html", {"usage": vue_usage.contexte_usage()}
+    )
 
 
 @app.post("/beecham/mission", response_class=HTMLResponse)

@@ -28,6 +28,17 @@ CREATE TABLE IF NOT EXISTS secw_executions(
   pid INTEGER, process_started_at TEXT, started_at TEXT, finished_at TEXT,
   delivery_outcome TEXT, resultat TEXT);
 
+-- Registre des PROCESSUS de Monique (superviseur, D-16) : tout ce que Monique lance s'y inscrit
+-- (nom, proprietaire, but, PID, PID parent) et s'en retire en finissant. Le registre EST le tag :
+-- le superviseur n'agit QUE sur ce qui est enregistré + ses descendants — jamais un process tiers.
+-- statut : running | fini | orphelin | tue | unknown. process_started_at = heure de démarrage
+-- exacte du PID (anti PID recyclé, via lease._debut_de).
+CREATE TABLE IF NOT EXISTS secw_processus(
+  id TEXT PRIMARY KEY, pid INTEGER, ppid INTEGER,
+  nom TEXT, proprietaire TEXT, but TEXT,
+  statut TEXT DEFAULT 'running',
+  process_started_at TEXT, started_at TEXT, finished_at TEXT);
+
 CREATE TABLE IF NOT EXISTS secw_taches_overlay(
   tache_id INTEGER PRIMARY KEY, statut TEXT, cloture_par TEXT, cloture_le TEXT);
 

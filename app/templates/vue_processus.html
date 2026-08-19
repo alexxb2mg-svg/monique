@@ -1,0 +1,43 @@
+<div class="besoin-titre">Surveillance système — les process de Monique</div>
+<p class="sous">Le superviseur ne voit et ne coupe QUE ce que Monique a lancé (+ ses sous-process). Jamais tes autres sessions.</p>
+
+<div class="actions">
+  <button class="btn primaire" hx-post="/processus/balayer" hx-target="#vue">Balayer — nettoyer les morts + couper les orphelins</button>
+</div>
+
+<div class="rupture"></div>
+
+{% if orphelins %}
+  <div class="h3">⚠ Orphelins VIVANTS (propriétaire mort — survivent pour rien)</div>
+  {% for o in orphelins %}
+  <div class="mini bm">
+    <div class="bm-corps">
+      <div class="bm-l1">
+        <span class="badge badge-rejete">orphelin</span>
+        <span class="agent-tag">{{ o.nom }}</span>
+        <span class="heure">PID {{ o.pid }} (parent mort {{ o.ppid }})</span>
+      </div>
+      <div class="bm-consigne">{{ o.but }}</div>
+      <div class="actions"><button class="btn primaire" hx-post="/processus/{{ o.id }}/tuer" hx-target="#vue">Couper (+ sous-arbre)</button></div>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="rupture"></div>
+{% endif %}
+
+<div class="h3">Process enregistrés</div>
+{% for p in procs %}
+  <div class="mini bm">
+    <div class="bm-corps">
+      <div class="bm-l1">
+        <span class="badge {{ 'badge-valide' if p.vivant else 'badge-rejete' }}">{{ 'vivant' if p.vivant else 'mort' }}</span>
+        <span class="agent-tag">{{ p.nom }}</span>
+        <span class="heure">PID {{ p.pid }} · {{ p.descendants }} sous-process · depuis {{ p.depuis }}</span>
+      </div>
+      <div class="bm-consigne">{{ p.but }} <span class="sous">— {{ p.proprietaire }}</span></div>
+      <div class="actions"><button class="btn" hx-post="/processus/{{ p.id }}/tuer" hx-target="#vue">Couper</button></div>
+    </div>
+  </div>
+{% else %}
+  <p class="vide">Aucun process enregistré pour l'instant.</p>
+{% endfor %}
