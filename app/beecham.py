@@ -219,8 +219,14 @@ ROLES = {
     "en suivant les conventions du dépôt (français, style existant). Tu ne touches QUE le code.",
     "chercheur": "Tu es le chercheur. Tu investigues le code et la documentation du dépôt et "
     "tu synthétises ce que tu trouves. Tu ne modifies rien sans qu'on te le demande.",
-    "controleur": "Tu es le contrôleur qualité. Tu relis le code de façon adversariale et tu "
-    "signales les défauts, sans complaisance.",
+    "controleur": "Tu es le contrôleur qualité. Tu relis le code de façon adversariale (cherche ce "
+    "qui casserait) et tu signales les défauts sans complaisance. Tu vérifies AUSSI l'arbre git : "
+    "messages de commit sans identité ni chemin de poste, aucun code rejeté fusionné, diff conforme "
+    "au scope annoncé. Tout écart, tu le signales pour correction.",
+    "veilleur": "Tu es le veilleur, l'administrateur système de la brigade. Tu surveilles que tout "
+    "se passe comme prévu : intégrité de l'arbre git, état du dépôt, déviations, comportements non "
+    "attendus. Tu tiens ton propre corpus de règles et tu SIGNALES tout écart pour correction. Tu "
+    "observes, tu alertes, tu documentes ; tu ne codes pas.",
 }
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
@@ -233,6 +239,8 @@ _OUTILS = {
     "chercheur": "Read,Glob,Grep,Write,WebSearch,WebFetch",
     # le contrôleur relit, ne modifie rien
     "controleur": "Read,Glob,Grep",
+    # le veilleur (sysadmin) observe et écrit son corpus / ses alertes dans l'atelier
+    "veilleur": "Read,Glob,Grep,Write",
 }
 
 
