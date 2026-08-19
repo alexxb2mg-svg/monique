@@ -6,6 +6,8 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
+import httpx
+
 import estop
 import usage
 
@@ -148,6 +150,40 @@ def _lancer_claude_cli(prompt: str, system: str | None, prof: ProviderProfile) -
     return {"texte": texte, "input_tokens": it, "output_tokens": ot}
 
 
+def _lancer_openai_compat(prompt: str, system: str | None, prof: ProviderProfile) -> dict:
+    # import local (pas en tête de module) : fournisseurs.py importe ProviderProfile
+    # depuis cerveau.py — un import en tête créerait un cycle.
+    import fournisseurs
+
+    cle = fournisseurs.lire_cle(prof.env_var)
+    if not cle:
+        return {"ok": False, "erreur": "cle_absente", "texte": ""}
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    try:
+        rep = httpx.post(
+            f"{prof.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {cle}"},
+            json={"model": prof.model, "messages": messages},
+            timeout=120,
+        )
+    except httpx.HTTPError:
+        return {"ok": False, "erreur": "reseau", "texte": ""}
+    if rep.status_code != 200:
+        return {"ok": False, "erreur": f"http_{rep.status_code}", "texte": ""}
+    d = rep.json()
+    texte = d["choices"][0]["message"]["content"]
+    u = d.get("usage") or {}
+    return {
+        "ok": True,
+        "texte": texte,
+        "input_tokens": u.get("prompt_tokens", 0),
+        "output_tokens": u.get("completion_tokens", 0),
+    }
+
+
 def appeler(
     agent, prompt, profile: ProviderProfile, task, system=None, chemin=None
 ) -> dict:
@@ -161,11 +197,18 @@ def appeler(
         if profile.mode == "claude_cli":
             res = _lancer_claude_cli(prompt, system, profile)
         elif profile.mode == "openai_compat":
-            return {
-                "ok": False,
-                "texte": "",
-                "erreur": "openai_compat_non_cable",
-                "usage": None,
+            oc = _lancer_openai_compat(prompt, system, profile)
+            if not oc["ok"]:
+                return {
+                    "ok": False,
+                    "texte": "",
+                    "erreur": oc["erreur"],
+                    "usage": None,
+                }
+            res = {
+                "texte": oc["texte"],
+                "input_tokens": oc["input_tokens"],
+                "output_tokens": oc["output_tokens"],
             }
         else:
             return {
