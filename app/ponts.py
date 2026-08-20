@@ -24,6 +24,7 @@ import threading
 import time
 import urllib.request
 
+import journal_ponts
 import superviseur
 
 _CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -268,6 +269,7 @@ def lancer(role, consigne, worktree=None, nom=None, mode=None) -> dict:
                 timeout=240,
             )
         except Exception as e:
+            journal_ponts.enregistrer_appel(nom, role, False, len(consigne), 0)
             return {
                 "ok": False,
                 "texte": "",
@@ -278,9 +280,11 @@ def lancer(role, consigne, worktree=None, nom=None, mode=None) -> dict:
             # Marquer l'usage MÊME en cas d'échec/timeout : sinon la requête suivante croit le pont
             # inactif depuis longtemps et frappe sans délai → risque de ban (revue Gemini #3).
             _dernier_usage[nom] = time.time()
+        texte_reponse = (r.stdout or "").strip()
+        journal_ponts.enregistrer_appel(nom, role, r.returncode == 0, len(consigne), len(texte_reponse))
         return {
             "ok": r.returncode == 0,
-            "texte": (r.stdout or "").strip(),
+            "texte": texte_reponse,
             "journal": [f"pont {nom} · {role} (rc={r.returncode})"],
             "session_id": None,
             "pont": nom,
