@@ -166,6 +166,51 @@ def deepseek_recherche_puis_expert(prompt_recherche, construire_prompt_expert) -
     return {"recherche": r1["texte"], "expert": r2["texte"] if r2["ok"] else "", "ok": r2["ok"]}
 
 
+_RE_BRANCHE = re.compile(r"(?mi)^[^\w`]*BRANCHE\s*\d+\s*[:\-]\s*\**\s*(.+?)\**\s*$")
+
+
+def deepseek_exploration_puis_expert(
+    prompt_branches, construire_prompt_approfondir, construire_prompt_expert, max_branches=5
+) -> dict:
+    """DeepSeek en TROIS temps (Alex, 2026-08-20 : « une passe supplémentaire par branche, pour
+    préciser le contexte, puis passage de témoin au mode expert qui aura plus de matière pour
+    choisir plutôt que d'inventer des motifs ») :
+    1) conv fraîche Instant : identifie des BRANCHES/sujets à explorer (format `BRANCHE N:`).
+    2) POUR CHAQUE branche, une conv fraîche Instant qui APPROFONDIT spécifiquement ce sujet (lit
+       le vrai code en détail sur ce point précis — pas un survol global).
+    3) conv fraîche Expert : synthétise sur TOUT le matériel accumulé (toutes les explorations
+       détaillées, pas juste les titres) pour la décision finale — a de la vraie matière, n'a pas
+       à inventer ses critères.
+    Renvoie {branches, recherches: [str par branche, même ordre], expert, ok}."""
+    ponts.nouvelle_conversation("deepseek")
+    r0 = ponts.lancer("chercheur", prompt_branches, nom="deepseek")  # pas de mode= -> Instant
+    if not r0["ok"]:
+        return {"branches": [], "recherches": [], "expert": "", "ok": False}
+    branches = _RE_BRANCHE.findall(r0["texte"])[:max_branches]
+    if not branches:
+        return {"branches": [], "recherches": [], "expert": "", "ok": False}
+
+    recherches = []
+    for branche in branches:
+        ponts.nouvelle_conversation("deepseek")  # fraîche -> Instant, exploration ciblée
+        r = ponts.lancer("chercheur", construire_prompt_approfondir(branche), nom="deepseek")
+        recherches.append(r["texte"] if r["ok"] else f"(échec exploration de : {branche})")
+
+    ponts.nouvelle_conversation("deepseek")  # fraîche AVANT de basculer en expert
+    materiel = "\n\n---\n\n".join(
+        f"# Branche : {b}\n{r}" for b, r in zip(branches, recherches)
+    )
+    r_expert = ponts.lancer(
+        "chercheur", construire_prompt_expert(materiel), nom="deepseek", mode="expert"
+    )
+    return {
+        "branches": branches,
+        "recherches": recherches,
+        "expert": r_expert["texte"] if r_expert["ok"] else "",
+        "ok": r_expert["ok"],
+    }
+
+
 def orchestrer(consigne_globale, chemin_cible, cmd_test, max_essais_par_brique=2) -> dict:
     """Orchestrateur à personas distinctes : DeepSeek PLANIFIE (`planifier`), puis chaque brique est
     IMPLÉMENTÉE + TESTÉE + CORRIGÉE (`implementer_et_corriger` : Gemini développe, DeepSeek

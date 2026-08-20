@@ -45,44 +45,55 @@ def lire_contexte_beecham() -> str:
         return f.read()[:_MAX_CONTEXTE_CAR]
 
 
-def _prompt_recherche_candidats(contexte) -> str:
+def _prompt_branches_candidats(contexte) -> str:
     return (
         "Voici le plan RÉEL (backlog priorisé) d'un projet agentique en construction, Monique :\n\n"
         f"{contexte}\n\n"
         f"Le code source RÉEL et À JOUR est public sur GitHub : {_REPO_GITHUB} — le dossier "
-        f"applicatif est {_REPO_GITHUB}/tree/main/app. Consulte-le (tu as un accès web) pour ancrer "
-        "tes propositions dans le VRAI code existant plutôt que dans le seul texte du plan — vérifie "
-        "ce qui existe déjà avant de proposer, pour ne rien redemander de fait.\n\n"
-        "Propose 3 à 5 candidats concrets pour « la prochaine brique de CODE à construire » — des "
-        "tâches BORNÉES et autonomes (un petit module/fonction cohérent, testable seul), PAS des "
-        "décisions organisationnelles ou humaines. Réponds une proposition par ligne, chaque ligne "
-        "commençant EXACTEMENT par `PROPOSITION N:` suivie d'une description courte et actionnable. "
-        "Aucun autre texte avant."
+        f"applicatif est {_REPO_GITHUB}/tree/main/app.\n\n"
+        "Identifie 3 à 5 BRANCHES (zones/sujets du backlog) qui mériteraient d'être creusées comme "
+        "candidats pour « la prochaine brique de CODE à construire ». À ce stade, ne détaille PAS "
+        "encore — juste le sujet. Réponds une branche par ligne, chaque ligne commençant EXACTEMENT "
+        "par `BRANCHE N:` suivie d'un sujet court. Aucun autre texte avant."
     )
 
 
-def _prompt_expert_candidats(recherche) -> str:
+def _prompt_approfondir_branche(branche) -> str:
     return (
-        "Voici une première recherche, ancrée sur le vrai code d'un projet (Monique), proposant des "
-        f"candidats pour la prochaine brique à construire :\n\n{recherche}\n\n"
-        "Réfléchis en PROFONDEUR sur cette liste : chaque candidat est-il vraiment pertinent, bien "
-        "borné, faisable en une brique ? Un candidat touche-t-il à un sujet sensible (sécurité, "
-        "garde-fous) sans le signaler ? Affine, reformule ou retire les candidats faibles — garde "
-        "entre 3 et 5 candidats. Réponds au MÊME format que la recherche : une proposition par "
+        f"Tu explores en profondeur ce sujet précis, dans le projet Monique (dépôt public "
+        f"{_REPO_GITHUB}, dossier {_REPO_GITHUB}/tree/main/app, tu as un accès web) : « {branche} ».\n\n"
+        "Va lire le VRAI code concerné (fichiers, fonctions, lignes précises si possible) — ce qui "
+        "existe déjà, ce qui manque, la complexité réelle, un éventuel risque (sécurité, garde-fous, "
+        "données sensibles). Ne propose pas encore de brique — rapporte ce que tu as trouvé, en "
+        "détail, comme matière brute pour une décision à venir."
+    )
+
+
+def _prompt_expert_candidats(materiel) -> str:
+    return (
+        "Voici le matériel accumulé par une exploration détaillée, branche par branche, du vrai "
+        f"code d'un projet (Monique) :\n\n{materiel}\n\n"
+        "Réfléchis en PROFONDEUR sur cette matière : à partir de ce que tu as vraiment trouvé (pas "
+        "en inventant), choisis les 3 à 5 meilleurs candidats pour « la prochaine brique de CODE à "
+        "construire » — bornés, faisables, testables seuls. Signale EXPLICITEMENT tout candidat "
+        "touchant un sujet sensible (sécurité, garde-fous, données). Réponds une proposition par "
         "ligne, chaque ligne commençant EXACTEMENT par `PROPOSITION N:`. Aucun autre texte avant."
     )
 
 
 def proposer_candidats(contexte) -> list[str]:
-    """DeepSeek EN DEUX TEMPS (cf. boucle_ponts.deepseek_recherche_puis_expert) : Instant pour
-    ancrer les candidats dans le VRAI code (plan.md + GitHub — Expert n'a pas d'accès web), puis
-    Expert pour une passe de réflexion profonde qui affine/filtre cette liste. Repli sur la
-    recherche brute si l'étape expert échoue (mieux qu'une liste vide)."""
-    res = boucle_ponts.deepseek_recherche_puis_expert(
-        _prompt_recherche_candidats(contexte), _prompt_expert_candidats
+    """DeepSeek EN TROIS TEMPS (Alex, 2026-08-20 : « une passe supplémentaire par branche… pour que
+    le mode expert ait plus de matière pour choisir, plutôt que d'inventer des motifs ») — cf.
+    boucle_ponts.deepseek_exploration_puis_expert : identifie des branches (Instant), approfondit
+    CHACUNE spécifiquement (Instant, une conv fraîche par branche), puis synthèse en profondeur
+    (Expert) sur TOUT le matériel accumulé. Repli sur la 1re branche brute si l'étape expert échoue."""
+    res = boucle_ponts.deepseek_exploration_puis_expert(
+        _prompt_branches_candidats(contexte), _prompt_approfondir_branche, _prompt_expert_candidats
     )
-    texte_final = res["expert"] if res["ok"] else res["recherche"]
-    return _RE_PROPOSITION.findall(texte_final)
+    if res["ok"]:
+        return _RE_PROPOSITION.findall(res["expert"])
+    # Repli : pas de synthèse experte, mais peut-être des branches identifiées -> mieux que rien.
+    return list(res["branches"])
 
 
 def choisir_brique(candidats) -> tuple:

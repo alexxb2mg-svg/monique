@@ -63,13 +63,16 @@ def test_ecrire_tests_extraction_vide_echoue_sans_planter(tmp_path, monkeypatch)
 
 
 def test_planifier_beecham_parse_les_propositions(monkeypatch):
-    """proposer_candidats est maintenant un chaînage recherche(Instant)+expert (DeepSeek 2 temps) :
-    mocker nouvelle_conversation aussi, sinon le test déclencherait une VRAIE navigation Chrome."""
-    texte = "PROPOSITION 1: faire A\nPROPOSITION 2: faire B"
+    """proposer_candidats est maintenant un chaînage à 3 temps (branches -> approfondissement par
+    branche -> synthèse experte), cf. boucle_ponts.deepseek_exploration_puis_expert."""
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
-    monkeypatch.setattr(
-        ponts, "lancer", lambda role, *a, **k: {"ok": True, "texte": texte, "journal": []}
-    )
+
+    def faux_lancer(role, prompt, nom=None, mode=None):
+        if mode == "expert":
+            return {"ok": True, "texte": "PROPOSITION 1: faire A\nPROPOSITION 2: faire B", "journal": []}
+        return {"ok": True, "texte": "BRANCHE 1: sujet A\nBRANCHE 2: sujet B", "journal": []}
+
+    monkeypatch.setattr(ponts, "lancer", faux_lancer)
     assert boucle_beecham.proposer_candidats("contexte") == ["faire A", "faire B"]
 
 
