@@ -32,7 +32,8 @@ spillover/
 # Journaux & logs : activité de la machine, pas du projet
 *.log
 *_audit*
-journal_*
+journal_*.log
+journal_*.jsonl
 
 # Config locale machine-spécifique
 ty.toml
