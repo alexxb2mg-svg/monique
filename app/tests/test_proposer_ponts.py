@@ -24,12 +24,23 @@ def test_ecrit_un_fichier_markdown_avec_le_resume(tmp_path):
 
 
 def test_nom_de_fichier_horodate_et_lisible(tmp_path):
+    """Test durci après un vrai bug (2026-08-20) : le format d'horodatage avait un %Y en double
+    (« 202620260820 ») — ce test trop permissif (juste .endswith('.md')) ne l'avait pas attrapé."""
+    import re
+
     resultat = {"brique": "Test simple", "ok": False, "essais": 3, "dernier_test": "1 failed"}
     chemin = proposer_ponts.proposer_a_alex(resultat, str(tmp_path))
 
     nom = os.path.basename(chemin)
     assert nom.endswith(".md")
-    assert "echec" in nom.lower() or "ko" in nom.lower() or "false" in nom.lower() or not resultat["ok"]
+    assert "echec" in nom.lower()
+    # Horodatage EXACT attendu : YYYYMMDD_HHMMSS (8 chiffres, underscore, 6 chiffres) -- pas de
+    # motif dupliqué comme "202620260820".
+    m = re.search(r"revue_(\d{8}_\d{6})_", nom)
+    assert m, f"horodatage absent ou malformé dans {nom!r}"
+    import time
+
+    assert m.group(1).startswith(time.strftime("%Y%m%d"))
 
 
 def test_dossier_absent_est_cree(tmp_path):

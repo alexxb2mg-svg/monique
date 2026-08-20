@@ -21,6 +21,7 @@ import re
 
 import boucle_ponts
 import ponts
+import proposer_ponts
 
 _ATELIER = os.path.join(
     # app/boucle_beecham.py -> app -> secretaire -> BSTEG_Logiciel, puis atelier/ (sibling de secretaire/)
@@ -31,6 +32,10 @@ _RE_PROPOSITION = re.compile(r"(?mi)^[^\w`]*PROPOSITION\s*\d+\s*[:\-]\s*\**\s*(.
 _RE_CHOIX = re.compile(r"(?mi)^[^\w`]*CHOIX\s*[:\-]\s*(\d+)")
 _MAX_CONTEXTE_CAR = 15000  # borne raisonnable pour un seul message pont
 _REPO_GITHUB = "https://github.com/alexxb2mg-svg/monique"  # public — lisible par DeepSeek (accès web)
+# Point de sortie visible : TOUT résultat (succès ET échec) y est déposé automatiquement — un
+# échec sur un sujet sensible doit rester visible, pas seulement les succès (trouvé le 20/08/2026 :
+# la tentative sur le garde-fou de sécurité avait échoué sans laisser aucune trace lisible).
+DOSSIER_PROPOSITIONS = os.path.join(_ATELIER, "propositions_ponts")
 
 
 def lire_contexte_beecham() -> str:
@@ -159,7 +164,9 @@ def construire_brique_sandbox(brique_desc, dossier_sandbox, index) -> dict:
     délègue à boucle_ponts.orchestrer (sous-planification + implémentation + correction).
     Testé avec l'interpréteur Python 3.14 (`ponts._PY314`) — le sandbox est un bac à sable
     d'idées, pas contraint aux dépendances minimales du venv réel de l'app (ex. `requests`,
-    absent de app/.venv car l'app n'en a jamais eu besoin jusqu'ici ; présent sur 3.14)."""
+    absent de app/.venv car l'app n'en a jamais eu besoin jusqu'ici ; présent sur 3.14).
+    Dépose TOUJOURS une proposition lisible dans DOSSIER_PROPOSITIONS (succès ET échec — un échec
+    sur un sujet sensible doit rester visible, jamais silencieux)."""
     os.makedirs(dossier_sandbox, exist_ok=True)  # autonome : ne dépend pas de l'appelant
     nom_module = f"brique_{index}"
     chemin_module = os.path.join(dossier_sandbox, nom_module + ".py")
@@ -167,11 +174,15 @@ def construire_brique_sandbox(brique_desc, dossier_sandbox, index) -> dict:
 
     tests_ok = ecrire_tests_pour_brique(brique_desc, nom_module, chemin_test)
     if not tests_ok:
-        return {"ok": False, "brique": brique_desc, "erreur": "échec écriture des tests"}
+        resultat = {"ok": False, "brique": brique_desc, "erreur": "échec écriture des tests"}
+        resultat["proposition_ecrite"] = proposer_ponts.proposer_a_alex(resultat, DOSSIER_PROPOSITIONS)
+        return resultat
 
     cmd_test = [ponts._PY314, "-m", "pytest", chemin_test, "-v"]
     res = boucle_ponts.orchestrer(brique_desc, chemin_module, cmd_test, max_essais_par_brique=2)
-    return {"brique": brique_desc, "chemin_module": chemin_module, "chemin_test": chemin_test, **res}
+    resultat = {"brique": brique_desc, "chemin_module": chemin_module, "chemin_test": chemin_test, **res}
+    resultat["proposition_ecrite"] = proposer_ponts.proposer_a_alex(resultat, DOSSIER_PROPOSITIONS)
+    return resultat
 
 
 def executer_cycle_beecham(dossier_sandbox, max_briques=None) -> dict:

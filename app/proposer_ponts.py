@@ -31,7 +31,7 @@ def proposer_a_alex(resultat: dict, dossier: str) -> str:
 
     statut_str = "succes" if ok else "echec"
     maintenant = datetime.now()
-    horodatage_nom = maintenant.strftime("%Y%Y%m%d_%H%M%S")
+    horodatage_nom = maintenant.strftime("%Y%m%d_%H%M%S")
     horodatage_lisible = maintenant.strftime("%Y-%m-%d %H:%M:%S")
 
     # Nettoyage du nom de brique pour le nom de fichier
