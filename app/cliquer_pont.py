@@ -44,12 +44,17 @@ def main() -> int:
             return 4
         page.bring_to_front()
         if args.goto:  # navigation directe (repart vierge, indépendant de la sidebar/boutons)
-            try:
-                page.goto(args.goto, wait_until="domcontentloaded", timeout=20000)
-            except Exception as e:
-                print(f"[ERR] navigation echouee : {e}", file=sys.stderr)
-                return 4
-            print("goto OK")
+            # Idempotent : une conversation deja VIERGE a exactement l'URL de base (DeepSeek/Gemini
+            # ajoutent un identifiant a l'URL des qu'un message existe) -- eviter une navigation
+            # inutile (churn visible, requetes reseau pour rien) si on y est deja.
+            deja_vierge = page.url.rstrip("/") == args.goto.rstrip("/")
+            if not deja_vierge:
+                try:
+                    page.goto(args.goto, wait_until="domcontentloaded", timeout=20000)
+                except Exception as e:
+                    print(f"[ERR] navigation echouee : {e}", file=sys.stderr)
+                    return 4
+            print("goto OK" if not deja_vierge else "deja vierge, navigation evitee")
             return 0
         el = page.locator(args.selecteur).first
         try:
