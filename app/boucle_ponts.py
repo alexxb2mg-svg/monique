@@ -104,7 +104,11 @@ def implementer_et_corriger(chemin_cible, consigne, cmd_test, max_essais=3) -> d
             return {"ok": True, "essais": essai, "journal": journal, "dernier_code": code, "dernier_test": sortie_test}
 
         if essai < max_essais:
-            d = ponts.lancer("controleur", _prompt_diagnostic(code, sortie_test), nom="deepseek")
+            # mode='expert' (DeepThink) : diagnostic = raisonnement pur sur du texte déjà fourni
+            # (code + sortie du test), aucun accès web requis -> le mode qui n'y accède pas convient.
+            d = ponts.lancer(
+                "controleur", _prompt_diagnostic(code, sortie_test), nom="deepseek", mode="expert"
+            )
             diagnostic = d["texte"] if d["ok"] else "(diagnostic indisponible)"
             journal.append(f"  DeepSeek diagnostique (ok={d['ok']}) : {diagnostic[:150]}")
 
@@ -132,10 +136,34 @@ def planifier(consigne_globale) -> list[str]:
         "par ligne, chaque ligne commençant EXACTEMENT par `BRIQUE N:` (N = numéro), suivie d'une "
         "description courte. Aucun autre texte avant."
     )
-    r = ponts.lancer("planificateur", prompt, nom="deepseek")
+    # mode='expert' : décomposition = raisonnement pur sur `consigne_globale` (texte déjà fourni par
+    # l'appelant), aucun accès web requis.
+    r = ponts.lancer("planificateur", prompt, nom="deepseek", mode="expert")
     if not r["ok"]:
         return []
     return _RE_BRIQUE.findall(r["texte"])
+
+
+def deepseek_recherche_puis_expert(prompt_recherche, construire_prompt_expert) -> dict:
+    """DeepSeek EN DEUX TEMPS, sur deux conversations FRAÎCHES distinctes (Alex, 2026-08-20) :
+    1) une conversation neuve retombe TOUJOURS en mode Instant (accès web — seul point d'entrée du
+       système vers le vrai code distant/GitHub) : `prompt_recherche` y est envoyé pour l'ancrage.
+    2) une NOUVELLE conversation fraîche, celle-ci basculée en mode Expert (DeepThink — réflexion
+       profonde mais AUCUN accès web) : `construire_prompt_expert(texte_recherche)` y est envoyé
+       pour approfondir sur la base du résultat capturé à l'étape 1.
+    Un mode fixe unique par pont perdrait soit l'ancrage réel, soit la profondeur de raisonnement ;
+    ce chaînage combine les deux. Renvoie {recherche, expert, ok} — ok=False si l'étape 1 échoue
+    (pas la peine de tenter l'étape 2 sans matière)."""
+    ponts.nouvelle_conversation("deepseek")
+    r1 = ponts.lancer("chercheur", prompt_recherche, nom="deepseek")  # pas de mode= -> Instant
+    if not r1["ok"]:
+        return {"recherche": "", "expert": "", "ok": False}
+
+    ponts.nouvelle_conversation("deepseek")  # fraîche AVANT de basculer en expert
+    r2 = ponts.lancer(
+        "chercheur", construire_prompt_expert(r1["texte"]), nom="deepseek", mode="expert"
+    )
+    return {"recherche": r1["texte"], "expert": r2["texte"] if r2["ok"] else "", "ok": r2["ok"]}
 
 
 def orchestrer(consigne_globale, chemin_cible, cmd_test, max_essais_par_brique=2) -> dict:

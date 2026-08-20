@@ -45,11 +45,8 @@ def lire_contexte_beecham() -> str:
         return f.read()[:_MAX_CONTEXTE_CAR]
 
 
-def proposer_candidats(contexte) -> list[str]:
-    """DeepSeek, CONVERSATION FRAÎCHE : propose des candidats concrets et bornés (pas de décision
-    organisationnelle) à partir du vrai plan de Beecham."""
-    ponts.nouvelle_conversation("deepseek")
-    prompt = (
+def _prompt_recherche_candidats(contexte) -> str:
+    return (
         "Voici le plan RÉEL (backlog priorisé) d'un projet agentique en construction, Monique :\n\n"
         f"{contexte}\n\n"
         f"Le code source RÉEL et À JOUR est public sur GitHub : {_REPO_GITHUB} — le dossier "
@@ -62,10 +59,30 @@ def proposer_candidats(contexte) -> list[str]:
         "commençant EXACTEMENT par `PROPOSITION N:` suivie d'une description courte et actionnable. "
         "Aucun autre texte avant."
     )
-    r = ponts.lancer("chercheur", prompt, nom="deepseek")
-    if not r["ok"]:
-        return []
-    return _RE_PROPOSITION.findall(r["texte"])
+
+
+def _prompt_expert_candidats(recherche) -> str:
+    return (
+        "Voici une première recherche, ancrée sur le vrai code d'un projet (Monique), proposant des "
+        f"candidats pour la prochaine brique à construire :\n\n{recherche}\n\n"
+        "Réfléchis en PROFONDEUR sur cette liste : chaque candidat est-il vraiment pertinent, bien "
+        "borné, faisable en une brique ? Un candidat touche-t-il à un sujet sensible (sécurité, "
+        "garde-fous) sans le signaler ? Affine, reformule ou retire les candidats faibles — garde "
+        "entre 3 et 5 candidats. Réponds au MÊME format que la recherche : une proposition par "
+        "ligne, chaque ligne commençant EXACTEMENT par `PROPOSITION N:`. Aucun autre texte avant."
+    )
+
+
+def proposer_candidats(contexte) -> list[str]:
+    """DeepSeek EN DEUX TEMPS (cf. boucle_ponts.deepseek_recherche_puis_expert) : Instant pour
+    ancrer les candidats dans le VRAI code (plan.md + GitHub — Expert n'a pas d'accès web), puis
+    Expert pour une passe de réflexion profonde qui affine/filtre cette liste. Repli sur la
+    recherche brute si l'étape expert échoue (mieux qu'une liste vide)."""
+    res = boucle_ponts.deepseek_recherche_puis_expert(
+        _prompt_recherche_candidats(contexte), _prompt_expert_candidats
+    )
+    texte_final = res["expert"] if res["ok"] else res["recherche"]
+    return _RE_PROPOSITION.findall(texte_final)
 
 
 def choisir_brique(candidats) -> tuple:
@@ -116,7 +133,9 @@ def revoir_tests_deepseek(code_test, brique_desc) -> str:
         "utiles, ou sont-ils trop faibles/triviaux ? Réponds en 2 lignes : la première EXACTEMENT "
         "`VERDICT: OK` ou `VERDICT: FAIBLE`, la seconde une justification courte."
     )
-    r = ponts.lancer("controleur", prompt, nom="deepseek")
+    # mode='expert' : relecture = raisonnement pur sur le code des tests (déjà fourni), aucun accès
+    # web requis.
+    r = ponts.lancer("controleur", prompt, nom="deepseek", mode="expert")
     return r["texte"] if r["ok"] else ""
 
 

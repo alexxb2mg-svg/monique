@@ -63,7 +63,10 @@ def test_ecrire_tests_extraction_vide_echoue_sans_planter(tmp_path, monkeypatch)
 
 
 def test_planifier_beecham_parse_les_propositions(monkeypatch):
+    """proposer_candidats est maintenant un chaînage recherche(Instant)+expert (DeepSeek 2 temps) :
+    mocker nouvelle_conversation aussi, sinon le test déclencherait une VRAIE navigation Chrome."""
     texte = "PROPOSITION 1: faire A\nPROPOSITION 2: faire B"
+    monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
     monkeypatch.setattr(
         ponts, "lancer", lambda role, *a, **k: {"ok": True, "texte": texte, "journal": []}
     )
