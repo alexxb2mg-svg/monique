@@ -115,9 +115,11 @@ def planifier(consigne_globale) -> list[str]:
     reference_ponts_format_parsable). Renvoie une liste de descriptions (peut être vide si échec)."""
     prompt = (
         f"Je veux construire ceci : {consigne_globale}\n\n"
-        "Planifie ce module en briques minimales et indépendantes (chacune un ajout cohérent au "
-        "même fichier). Réponds une brique par ligne, chaque ligne commençant EXACTEMENT par "
-        "`BRIQUE N:` (N = numéro), suivie d'une description courte. Aucun autre texte avant."
+        "Planifie ce module en briques minimales et indépendantes. IMPORTANT : chaque brique est un "
+        "AJOUT DE CODE dans le MÊME et UNIQUE fichier — jamais une brique qui créerait un fichier "
+        "séparé (les tests existent déjà à part, ne les inclus PAS dans ce plan). Réponds une brique "
+        "par ligne, chaque ligne commençant EXACTEMENT par `BRIQUE N:` (N = numéro), suivie d'une "
+        "description courte. Aucun autre texte avant."
     )
     r = ponts.lancer("planificateur", prompt, nom="deepseek")
     if not r["ok"]:

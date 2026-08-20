@@ -15,6 +15,7 @@ réels de Monique — cette boucle n'a ni l'isolation worktree, ni le contrôleu
 validation d'Alex de la vraie brigade Beecham. Un humain relit et fusionne à la main s'il le souhaite.
 """
 
+import ast
 import os
 import re
 
@@ -29,6 +30,7 @@ _ATELIER = os.path.join(
 _RE_PROPOSITION = re.compile(r"(?mi)^[^\w`]*PROPOSITION\s*\d+\s*[:\-]\s*\**\s*(.+?)\**\s*$")
 _RE_CHOIX = re.compile(r"(?mi)^[^\w`]*CHOIX\s*[:\-]\s*(\d+)")
 _MAX_CONTEXTE_CAR = 15000  # borne raisonnable pour un seul message pont
+_REPO_GITHUB = "https://github.com/alexxb2mg-svg/monique"  # public — lisible par DeepSeek (accès web)
 
 
 def lire_contexte_beecham() -> str:
@@ -45,6 +47,10 @@ def proposer_candidats(contexte) -> list[str]:
     prompt = (
         "Voici le plan RÉEL (backlog priorisé) d'un projet agentique en construction, Monique :\n\n"
         f"{contexte}\n\n"
+        f"Le code source RÉEL et À JOUR est public sur GitHub : {_REPO_GITHUB} — le dossier "
+        f"applicatif est {_REPO_GITHUB}/tree/main/app. Consulte-le (tu as un accès web) pour ancrer "
+        "tes propositions dans le VRAI code existant plutôt que dans le seul texte du plan — vérifie "
+        "ce qui existe déjà avant de proposer, pour ne rien redemander de fait.\n\n"
         "Propose 3 à 5 candidats concrets pour « la prochaine brique de CODE à construire » — des "
         "tâches BORNÉES et autonomes (un petit module/fonction cohérent, testable seul), PAS des "
         "décisions organisationnelles ou humaines. Réponds une proposition par ligne, chaque ligne "
@@ -81,33 +87,60 @@ def choisir_brique(candidats) -> tuple:
     return idx, r["texte"]
 
 
-def ecrire_tests_pour_brique(brique_desc, nom_module, chemin_test) -> bool:
-    """Gemini, CONVERSATION FRAÎCHE : écrit les tests AVANT l'implémentation (juge indépendant, pas
-    l'implémenteur qui s'auto-juge). Renvoie True si un fichier de test a bien été écrit."""
-    ponts.nouvelle_conversation("gemini")
-    prompt = (
+def _prompt_ecrire_tests(nom_module, brique_desc) -> str:
+    return (
         f"Tu vas écrire des tests pytest pour un module Python `{nom_module}.py` qui devra plus tard "
         f"implémenter ceci : {brique_desc}\n\n"
         f"Écris UNIQUEMENT les tests (pas l'implémentation), avec `from {nom_module} import ...` "
-        "pour les imports nécessaires. 3 à 6 tests : le cas nominal + 1-2 cas limites. Donne le "
-        "fichier de test COMPLET dans un seul bloc de code Python, prêt à écrire sur disque."
+        "pour les imports nécessaires. 3 à 6 tests : le cas nominal + 1-2 cas limites. Bibliothèque "
+        "standard uniquement pour les mocks (unittest.mock). Donne le fichier de test COMPLET dans "
+        "un seul bloc de code Python, prêt à écrire sur disque."
     )
-    r = ponts.lancer("developpeur", prompt, nom="gemini")
+
+
+def ecrire_tests_pour_brique(brique_desc, nom_module, chemin_test) -> bool:
+    """Gemini, CONVERSATION FRAÎCHE : écrit les tests AVANT l'implémentation (juge indépendant, pas
+    l'implémenteur qui s'auto-juge). VALIDE LA SYNTAXE avant d'écrire (un test cassé bloquerait toute
+    la boucle de correction en aval : elle ne peut réparer que l'IMPLÉMENTATION, jamais le test lui-
+    même) — retente UNE fois avec l'erreur précise si invalide. Renvoie True si un test SYNTAXIQUEMENT
+    VALIDE a été écrit."""
+    ponts.nouvelle_conversation("gemini")
+    r = ponts.lancer("developpeur", _prompt_ecrire_tests(nom_module, brique_desc), nom="gemini")
     if not r["ok"]:
         return False
     code_test = ponts.extraire_code("gemini")
-    if not code_test.strip():
-        return False
-    with open(chemin_test, "w", encoding="utf-8") as f:
-        f.write(code_test + "\n")
-    return True
+
+    for derniere_tentative in (False, True):  # 1 essai + 1 retente sur erreur de syntaxe
+        if not code_test.strip():
+            return False
+        try:
+            ast.parse(code_test)
+        except SyntaxError as e:
+            if derniere_tentative:
+                return False  # toujours invalide après la retente
+            prompt_fix = (
+                f"Ce code Python a une erreur de syntaxe :\n```python\n{code_test}\n```\n\n"
+                f"Erreur : {e}\n\n"
+                "Corrige UNIQUEMENT cette erreur (ex. si c'est un littéral bytes b'...' contenant un "
+                "accent, retire l'accent ou passe en str). Donne le fichier COMPLET corrigé dans un "
+                "seul bloc de code Python."
+            )
+            r2 = ponts.lancer("developpeur", prompt_fix, nom="gemini")
+            code_test = ponts.extraire_code("gemini") if r2["ok"] else ""
+            continue
+        with open(chemin_test, "w", encoding="utf-8") as f:
+            f.write(code_test + "\n")
+        return True
+    return False
 
 
 def construire_brique_sandbox(brique_desc, dossier_sandbox, index) -> dict:
     """Construit UNE brique dans le sandbox : écrit ses tests (Gemini, juge indépendant), puis
-    délègue à boucle_ponts.orchestrer (sous-planification + implémentation + correction)."""
-    import sys
-
+    délègue à boucle_ponts.orchestrer (sous-planification + implémentation + correction).
+    Testé avec l'interpréteur Python 3.14 (`ponts._PY314`) — le sandbox est un bac à sable
+    d'idées, pas contraint aux dépendances minimales du venv réel de l'app (ex. `requests`,
+    absent de app/.venv car l'app n'en a jamais eu besoin jusqu'ici ; présent sur 3.14)."""
+    os.makedirs(dossier_sandbox, exist_ok=True)  # autonome : ne dépend pas de l'appelant
     nom_module = f"brique_{index}"
     chemin_module = os.path.join(dossier_sandbox, nom_module + ".py")
     chemin_test = os.path.join(dossier_sandbox, f"test_{nom_module}.py")
@@ -116,7 +149,7 @@ def construire_brique_sandbox(brique_desc, dossier_sandbox, index) -> dict:
     if not tests_ok:
         return {"ok": False, "brique": brique_desc, "erreur": "échec écriture des tests"}
 
-    cmd_test = [sys.executable, "-m", "pytest", chemin_test, "-v"]
+    cmd_test = [ponts._PY314, "-m", "pytest", chemin_test, "-v"]
     res = boucle_ponts.orchestrer(brique_desc, chemin_module, cmd_test, max_essais_par_brique=2)
     return {"brique": brique_desc, "chemin_module": chemin_module, "chemin_test": chemin_test, **res}
 
@@ -124,7 +157,6 @@ def construire_brique_sandbox(brique_desc, dossier_sandbox, index) -> dict:
 def executer_cycle_beecham(dossier_sandbox, max_briques=None) -> dict:
     """La boucle complète : PROPOSER (une fois) -> CHOISIR -> CONSTRUIRE -> retirer -> reCHOISIR,
     jusqu'à épuisement du plan initial (ou `max_briques`, pour brider un premier essai)."""
-    os.makedirs(dossier_sandbox, exist_ok=True)
     contexte = lire_contexte_beecham()
     candidats = proposer_candidats(contexte)
     restants = list(candidats)
