@@ -169,26 +169,25 @@ def deepseek_recherche_puis_expert(prompt_recherche, construire_prompt_expert) -
 _RE_BRANCHE = re.compile(r"(?mi)^[^\w`]*BRANCHE\s*\d+\s*[:\-]\s*\**\s*(.+?)\**\s*$")
 
 
-def deepseek_exploration_puis_expert(
-    prompt_branches, construire_prompt_approfondir, construire_prompt_expert, max_branches=5
+def deepseek_explore_gemini_synthetise(
+    prompt_branches, construire_prompt_approfondir, construire_prompt_synthese, max_branches=5
 ) -> dict:
-    """DeepSeek en TROIS temps (Alex, 2026-08-20 : « une passe supplémentaire par branche, pour
-    préciser le contexte, puis passage de témoin au mode expert qui aura plus de matière pour
-    choisir plutôt que d'inventer des motifs ») :
-    1) conv fraîche Instant : identifie des BRANCHES/sujets à explorer (format `BRANCHE N:`).
-    2) POUR CHAQUE branche, une conv fraîche Instant qui APPROFONDIT spécifiquement ce sujet (lit
-       le vrai code en détail sur ce point précis — pas un survol global).
-    3) conv fraîche Expert : synthétise sur TOUT le matériel accumulé (toutes les explorations
-       détaillées, pas juste les titres) pour la décision finale — a de la vraie matière, n'a pas
-       à inventer ses critères.
-    Renvoie {branches, recherches: [str par branche, même ordre], expert, ok}."""
+    """DeepSeek EXPLORE, Gemini SYNTHÉTISE — chacun sur sa vraie force (Alex, 2026-08-20) :
+    1) DeepSeek, conv fraîche Instant : identifie des BRANCHES/sujets à explorer (`BRANCHE N:`).
+    2) DeepSeek, POUR CHAQUE branche, une conv fraîche Instant qui APPROFONDIT spécifiquement ce
+       sujet (lit le vrai code en détail — DeepSeek Instant est le SEUL point d'entrée web/GitHub).
+    3) Gemini synthétise sur TOUT le matériel accumulé, SANS TRONCATURE — sa force est sa fenêtre
+       de contexte énorme, elle tient l'ensemble sans rien perdre. Corrige un bug réel (20/08/2026,
+       même soirée) : donné à DeepSeek Expert (pas de force de contexte particulière, pas d'accès
+       web), un matériel de 36 289 car. a fait ÉCHOUER l'appel, perdant toute la recherche.
+    Renvoie {branches, recherches: [str par branche, même ordre], synthese, ok}."""
     ponts.nouvelle_conversation("deepseek")
     r0 = ponts.lancer("chercheur", prompt_branches, nom="deepseek")  # pas de mode= -> Instant
     if not r0["ok"]:
-        return {"branches": [], "recherches": [], "expert": "", "ok": False}
+        return {"branches": [], "recherches": [], "synthese": "", "ok": False}
     branches = _RE_BRANCHE.findall(r0["texte"])[:max_branches]
     if not branches:
-        return {"branches": [], "recherches": [], "expert": "", "ok": False}
+        return {"branches": [], "recherches": [], "synthese": "", "ok": False}
 
     recherches = []
     for branche in branches:
@@ -196,22 +195,15 @@ def deepseek_exploration_puis_expert(
         r = ponts.lancer("chercheur", construire_prompt_approfondir(branche), nom="deepseek")
         recherches.append(r["texte"] if r["ok"] else f"(échec exploration de : {branche})")
 
-    ponts.nouvelle_conversation("deepseek")  # fraîche AVANT de basculer en expert
-    # Bug réel (20/08/2026) : sans troncature, 5 branches x jusqu'à 9000 car. de recherche réelle
-    # produisaient un prompt de 36 289 caractères -> l'appel expert a ÉCHOUÉ (timeout probable),
-    # et tout le matériel accumulé (vraie recherche) était perdu silencieusement (repli sur les
-    # seuls titres de branches). Tronqué à 2500 car. par branche -> prompt final borné et fiable.
-    materiel = "\n\n---\n\n".join(
-        f"# Branche : {b}\n{r[:2500]}" for b, r in zip(branches, recherches)
+    materiel = "\n\n---\n\n".join(  # PAS de troncature : la fenêtre de Gemini tient l'ensemble
+        f"# Branche : {b}\n{r}" for b, r in zip(branches, recherches)
     )
-    r_expert = ponts.lancer(
-        "chercheur", construire_prompt_expert(materiel), nom="deepseek", mode="expert"
-    )
+    r_synth = ponts.lancer("chercheur", construire_prompt_synthese(materiel), nom="gemini")
     return {
         "branches": branches,
         "recherches": recherches,
-        "expert": r_expert["texte"] if r_expert["ok"] else "",
-        "ok": r_expert["ok"],
+        "synthese": r_synth["texte"] if r_synth["ok"] else "",
+        "ok": r_synth["ok"],
     }
 
 

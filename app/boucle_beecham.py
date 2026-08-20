@@ -69,30 +69,32 @@ def _prompt_approfondir_branche(branche) -> str:
     )
 
 
-def _prompt_expert_candidats(materiel) -> str:
+def _prompt_synthese_candidats(materiel) -> str:
     return (
         "Voici le matériel accumulé par une exploration détaillée, branche par branche, du vrai "
         f"code d'un projet (Monique) :\n\n{materiel}\n\n"
-        "Réfléchis en PROFONDEUR sur cette matière : à partir de ce que tu as vraiment trouvé (pas "
-        "en inventant), choisis les 3 à 5 meilleurs candidats pour « la prochaine brique de CODE à "
-        "construire » — bornés, faisables, testables seuls. Signale EXPLICITEMENT tout candidat "
-        "touchant un sujet sensible (sécurité, garde-fous, données). Réponds une proposition par "
-        "ligne, chaque ligne commençant EXACTEMENT par `PROPOSITION N:`. Aucun autre texte avant."
+        "Synthétise cette matière : à partir de ce qui a vraiment été trouvé (pas en inventant), "
+        "choisis les 3 à 5 meilleurs candidats pour « la prochaine brique de CODE à construire » — "
+        "bornés, faisables, testables seuls. Signale EXPLICITEMENT tout candidat touchant un sujet "
+        "sensible (sécurité, garde-fous, données). Réponds une proposition par ligne, chaque ligne "
+        "commençant EXACTEMENT par `PROPOSITION N:`. Aucun autre texte avant."
     )
 
 
 def proposer_candidats(contexte) -> list[str]:
-    """DeepSeek EN TROIS TEMPS (Alex, 2026-08-20 : « une passe supplémentaire par branche… pour que
-    le mode expert ait plus de matière pour choisir, plutôt que d'inventer des motifs ») — cf.
-    boucle_ponts.deepseek_exploration_puis_expert : identifie des branches (Instant), approfondit
-    CHACUNE spécifiquement (Instant, une conv fraîche par branche), puis synthèse en profondeur
-    (Expert) sur TOUT le matériel accumulé. Repli sur la 1re branche brute si l'étape expert échoue."""
-    res = boucle_ponts.deepseek_exploration_puis_expert(
-        _prompt_branches_candidats(contexte), _prompt_approfondir_branche, _prompt_expert_candidats
+    """DeepSeek EXPLORE, Gemini SYNTHÉTISE (Alex, 2026-08-20 : « il faut faire faire une synthèse à
+    Gemini » — sa fenêtre de contexte énorme tient TOUT le matériel accumulé sans troncature, corrige
+    un bug réel où DeepSeek Expert étouffait sur 36 000+ caractères) — cf.
+    boucle_ponts.deepseek_explore_gemini_synthetise : DeepSeek identifie des branches (Instant),
+    approfondit CHACUNE spécifiquement (Instant, une conv fraîche par branche — seul point d'entrée
+    web du système), puis Gemini synthétise sur TOUT le matériel accumulé. Repli sur les branches
+    brutes si la synthèse échoue."""
+    res = boucle_ponts.deepseek_explore_gemini_synthetise(
+        _prompt_branches_candidats(contexte), _prompt_approfondir_branche, _prompt_synthese_candidats
     )
     if res["ok"]:
-        return _RE_PROPOSITION.findall(res["expert"])
-    # Repli : pas de synthèse experte, mais peut-être des branches identifiées -> mieux que rien.
+        return _RE_PROPOSITION.findall(res["synthese"])
+    # Repli : pas de synthèse, mais peut-être des branches identifiées -> mieux que rien.
     return list(res["branches"])
 
 

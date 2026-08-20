@@ -63,12 +63,12 @@ def test_ecrire_tests_extraction_vide_echoue_sans_planter(tmp_path, monkeypatch)
 
 
 def test_planifier_beecham_parse_les_propositions(monkeypatch):
-    """proposer_candidats est maintenant un chaînage à 3 temps (branches -> approfondissement par
-    branche -> synthèse experte), cf. boucle_ponts.deepseek_exploration_puis_expert."""
+    """proposer_candidats : DeepSeek explore (branches -> approfondissement par branche), Gemini
+    synthétise, cf. boucle_ponts.deepseek_explore_gemini_synthetise."""
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
 
     def faux_lancer(role, prompt, nom=None, mode=None):
-        if mode == "expert":
+        if nom == "gemini":
             return {"ok": True, "texte": "PROPOSITION 1: faire A\nPROPOSITION 2: faire B", "journal": []}
         return {"ok": True, "texte": "BRANCHE 1: sujet A\nBRANCHE 2: sujet B", "journal": []}
 
