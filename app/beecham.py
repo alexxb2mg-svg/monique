@@ -246,7 +246,12 @@ ROLES = {
     "orientations. Tu ALLÈGES Beecham : tu penses la stratégie pour qu'il décide sans noyer son "
     "contexte. Tu proposes ; Beecham tranche.",
     "developpeur": "Tu es le développeur de Monique. Tu écris et modifies le code proprement, "
-    "en suivant les conventions du dépôt (français, style existant). Tu ne touches QUE le code.",
+    "en suivant les conventions du dépôt (français, style existant). Tu ne touches QUE le code. "
+    "DISCIPLINE (inspirée de Ponytail) : vise la solution la plus PARESSEUSE qui marche vraiment "
+    "— la plus simple, la plus courte, la plus minimale. Avant d'écrire, demande-toi si ce code "
+    "doit seulement exister (YAGNI). Préfère la bibliothèque standard au code maison, une fonction "
+    "native à une dépendance, une ligne à cinquante. Pas d'abstraction spéculative, pas de "
+    "flexibilité que personne ne demande : le strict nécessaire pour que ça marche et reste lisible.",
     "chercheur": "Tu es le chercheur. Tu investigues le code et la documentation du dépôt et "
     "tu synthétises ce que tu trouves. Tu ne modifies rien sans qu'on te le demande.",
     "controleur": "Tu es le contrôleur qualité. Tu relis le code de façon adversariale (cherche ce "
@@ -442,6 +447,21 @@ def _creer_worktree(branche) -> Path:
     return wt
 
 
+# Garde-fou anti-boucle — patron « wrap-up budget » de Hermes (nousresearch/hermes-agent) adapté.
+# Chez eux, à 80 % du budget temps, un message « arrête d'explorer, produis le livrable » est
+# injecté DANS la boucle de conversation. Nos sessions `claude -p` sont atomiques (une fois Popen
+# lancé, on ne possède plus leur boucle, on ne peut pas leur parler), donc on PRÉ-CHARGE la même
+# consigne dans le prompt de mission. Vise le mode d'échec des agents autonomes : explorer sans
+# fin, brûler des tokens, ne jamais conclure — puis se faire tuer au timeout, travail perdu.
+_CONVERGENCE = (
+    "\n\nBUDGET & CONVERGENCE — cette session est bornée dans le temps. Ne pars pas en exploration "
+    "sans fin : prends le plus court chemin qui règle la consigne. Dès que tu as de quoi produire "
+    "ton livrable, produis-le ; ne cherche ni la perfection ni à en faire plus que la consigne ne "
+    "demande (YAGNI). Si tu sens que ça traîne ou que tu tournes en rond, ARRÊTE et conclus avec "
+    "ce que tu as déjà plutôt que de continuer."
+)
+
+
 def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
     """Session codeur SCOPÉE : Read/Edit/Write only (pas de Bash), cwd=worktree, aucun MCP.
     `reprendre`=<session_id> : REPREND la session claude précédente (`--resume`) au lieu d'en
@@ -481,6 +501,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
         ).replace(
             "\x00", ""
         )  # anti-octet-nul (Windows CreateProcess refuse \x00 -> ValueError)
+    prompt = prompt + _CONVERGENCE  # garde-fou anti-boucle, pré-chargé dans les deux branches
     settings = (
         _ecrire_garde()
     )  # garde-fou d'écriture (hors dépôt) : refuse tout hors zones
