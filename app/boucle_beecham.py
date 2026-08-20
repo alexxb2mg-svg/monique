@@ -98,6 +98,23 @@ def _prompt_ecrire_tests(nom_module, brique_desc) -> str:
     )
 
 
+def revoir_tests_deepseek(code_test, brique_desc) -> str:
+    """DeepSeek relit les tests écrits par Gemini (renforce le juge : un test faible validerait
+    silencieusement une mauvaise implémentation). Verdict INFORMATIF, non bloquant — visible dans
+    le journal, laissé à l'appréciation humaine plutôt que d'ajouter une seconde boucle de retente
+    à celle déjà existante pour la syntaxe (discipline Ponytail : pas de complexité pour un gain
+    marginal). Renvoie "" en cas d'échec d'envoi."""
+    prompt = (
+        f"Voici des tests pytest écrits pour une brique : « {brique_desc} ».\n\n"
+        f"```python\n{code_test}\n```\n\n"
+        "Relis-les d'un œil critique : couvrent-ils vraiment le cas nominal et les cas limites "
+        "utiles, ou sont-ils trop faibles/triviaux ? Réponds en 2 lignes : la première EXACTEMENT "
+        "`VERDICT: OK` ou `VERDICT: FAIBLE`, la seconde une justification courte."
+    )
+    r = ponts.lancer("controleur", prompt, nom="deepseek")
+    return r["texte"] if r["ok"] else ""
+
+
 def ecrire_tests_pour_brique(brique_desc, nom_module, chemin_test) -> bool:
     """Gemini, CONVERSATION FRAÎCHE : écrit les tests AVANT l'implémentation (juge indépendant, pas
     l'implémenteur qui s'auto-juge). VALIDE LA SYNTAXE avant d'écrire (un test cassé bloquerait toute
@@ -128,6 +145,9 @@ def ecrire_tests_pour_brique(brique_desc, nom_module, chemin_test) -> bool:
             r2 = ponts.lancer("developpeur", prompt_fix, nom="gemini")
             code_test = ponts.extraire_code("gemini") if r2["ok"] else ""
             continue
+        verdict = revoir_tests_deepseek(code_test, brique_desc)
+        if verdict:
+            print(f"[revue DeepSeek des tests] {verdict[:200]}")  # informatif, jamais bloquant
         with open(chemin_test, "w", encoding="utf-8") as f:
             f.write(code_test + "\n")
         return True

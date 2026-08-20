@@ -16,7 +16,6 @@ verrou par pont, PID pris du Popen (pas de WMI dans le cas nominal), Chrome tué
 cadence marquée même après un échec (anti-ban), nom de pont validé, _pid_browser vérifie le profil.
 """
 
-import datetime
 import os
 import random
 import subprocess
@@ -71,7 +70,6 @@ _INTERVALLE_MIN_S = 8
 _INTERVALLE_MAX_S = 35
 _PLAFOND_JOUR = 40
 _dernier_usage: dict = {}  # nom -> timestamp du dernier envoi (routeur + cadence)
-_compteur_jour: dict = {}  # nom -> (jour_iso, nb) pour le plafond quotidien
 # Un verrou RÉENTRANT par pont : sérialise les appels concurrents (ouvrir/fermer/lancer) sur un même
 # pont — sinon deux appels simultanés entremêlent leurs prompts dans le même onglet et violent la
 # cadence. RLock car lancer() prend le verrou puis appelle ouvrir() (même thread → réentrée OK).
@@ -231,10 +229,10 @@ def lancer(role, consigne, worktree=None, nom=None, mode=None) -> dict:
     nom = _choisir_pont(nom)
     with _verrous[nom]:
         # Plafond quotidien par pont (anti-volume) : au-delà, on refuse SANS même ouvrir Chrome.
-        jour = datetime.date.today().isoformat()
-        d, n = _compteur_jour.get(nom, (jour, 0))
-        n = 0 if d != jour else n
-        if n >= _PLAFOND_JOUR:
+        # Basé sur le JOURNAL PERSISTÉ (journal_ponts), pas une mémoire de process — un compteur en
+        # mémoire se réinitialise à chaque relance et ne protège donc RIEN en usage réel (trouvé le
+        # 20/08/2026 : nos tests via `python -c` repartaient à zéro à chaque appel).
+        if journal_ponts.appels_aujourdhui(nom) >= _PLAFOND_JOUR:
             return {
                 "ok": False,
                 "texte": "",
@@ -254,7 +252,8 @@ def lancer(role, consigne, worktree=None, nom=None, mode=None) -> dict:
         ecoule = time.time() - _dernier_usage.get(nom, 0)
         if ecoule < cible:
             time.sleep(cible - ecoule)
-        _compteur_jour[nom] = (jour, n + 1)
+        # Pas d'incrément manuel ici : journal_ponts.enregistrer_appel() (plus bas) journalise déjà
+        # chaque tentative réelle -- c'est CE journal, persisté, qui nourrit le plafond du dessus.
         cfg = PONTS[nom]
         cmd_sender = [cfg["python"], cfg["sender"], "--message", consigne, "--timeout", "120"]
         if mode and mode in cfg.get("modes", {}):  # ex. DeepSeek : instant | expert | vision
@@ -318,6 +317,33 @@ def extraire_code(nom) -> str:
     except Exception:
         return ""
     return (r.stdout or "").strip()
+
+
+def fermer_inactifs(seuil_s: int = 1800) -> list[str]:
+    """Ferme les ponts suivis dont l'inactivité dépasse le seuil spécifié (résilience : évite les
+    Chrome oubliés qui traînent en mangeant de la RAM). Scope volontairement simple : ne touche
+    PAS aux ponts jamais utilisés (dernier_usage=None) — écrit par Gemini, revu et inséré ici.
+
+    Args:
+        seuil_s: Seuil d'inactivité en secondes (par défaut 1800s / 30min).
+
+    Returns:
+        La liste des noms des ponts qui ont été fermés.
+    """
+    maintenant = time.time()
+    fermes = []
+
+    for pont in etat():
+        if not pont.get("suivi"):
+            continue
+
+        dernier_usage = pont.get("dernier_usage")
+        if dernier_usage is not None and (maintenant - dernier_usage) > seuil_s:
+            nom = pont["nom"]
+            fermer(nom)
+            fermes.append(nom)
+
+    return fermes
 
 
 def nouvelle_conversation(nom) -> dict:

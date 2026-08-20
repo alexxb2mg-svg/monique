@@ -23,12 +23,22 @@ _TIMEOUT_TEST_S = 60
 _TRONQUER_SORTIE_TEST = 2000  # caractères de sortie de test envoyés au diagnostic
 _RE_BRIQUE = re.compile(r"(?mi)^[^\w`]*BRIQUE\s*\d+\s*[:\-]\s*\**\s*(.+?)\**\s*$")
 
+# Discipline Ponytail (cf. ROLES["developpeur"] de beecham.py) — formulée par Gemini, insérée ici :
+# cohérence entre le développeur payant (claude -p) et les ponts gratuits.
+_DISCIPLINE_PONYTAIL = (
+    "\n\nViser la solution la plus simple, courte et minimale qui fonctionne réellement, sans "
+    "abstraction spéculative ni sur-ingénierie. Privilégier systématiquement la bibliothèque "
+    "standard Python et n'ajouter une dépendance externe que si c'est strictement indispensable. "
+    "Produire un code direct, lisible et sobre, sans anticiper de besoins futurs incertains."
+)
+
 
 def _prompt_implementation(consigne) -> str:
     return (
         f"Écris le contenu COMPLET du fichier Python suivant : {consigne}\n\n"
         "Donne le fichier ENTIER dans un seul bloc de code Python, prêt à être écrit tel quel "
         "sur disque (pas d'extrait, pas de '...', pas de commentaire hors code)."
+        + _DISCIPLINE_PONYTAIL
     )
 
 
@@ -38,6 +48,7 @@ def _prompt_correction(code, diagnostic) -> str:
         f"Il échoue aux tests. Diagnostic reçu :\n{diagnostic}\n\n"
         "Corrige le fichier en conséquence. Donne le fichier Python COMPLET corrigé dans un "
         "seul bloc de code, prêt à être écrit tel quel sur disque."
+        + _DISCIPLINE_PONYTAIL
     )
 
 

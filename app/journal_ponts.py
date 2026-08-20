@@ -72,3 +72,33 @@ def resume(chemin=None) -> dict:
         "total_tokens_entree": sum(s["tokens_entree"] for s in stats.values()),
         "total_tokens_sortie": sum(s["tokens_sortie"] for s in stats.values()),
     }
+
+
+def appels_aujourdhui(pont, chemin=None) -> int:
+    """Compte les appels réels du jour pour `pont`, depuis le journal PERSISTÉ (pas une mémoire de
+    process — un plafond en mémoire se réinitialise à chaque relance, ce qu'on veut éviter).
+    Écrit par DeepSeek, revu et inséré ici. Fail-soft total : jamais d'exception, 0 dans le pire cas.
+    """
+    path = chemin if chemin is not None else CHEMIN_JOURNAL
+    today = time.strftime("%Y-%m-%d")
+    count = 0
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                    if record.get("pont") != pont:
+                        continue
+                    horodatage = record.get("horodatage")
+                    if isinstance(horodatage, str) and len(horodatage) >= 10 and horodatage[:10] == today:
+                        count += 1
+                except Exception:
+                    continue  # ligne corrompue -> ignorée
+    except Exception:
+        pass  # fichier absent/inaccessible -> 0
+
+    return count
