@@ -58,6 +58,28 @@ def test_aucune_branche_parsee_arrete_tout(monkeypatch):
     assert res["ok"] is False
 
 
+def test_materiel_tronque_par_branche_avant_synthese(monkeypatch):
+    """Bug réel (20/08/2026) : sans troncature, 5 branches x ~9000 car. de vraie recherche ont
+    produit un prompt de 36 289 caractères -> l'appel expert a ÉCHOUÉ, tout le matériel accumulé
+    a été perdu silencieusement (repli sur les seuls titres de branches, pauvre)."""
+    monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
+    appels_lancer = []
+
+    def faux_lancer(role, prompt, nom=None, mode=None):
+        appels_lancer.append(prompt)
+        if mode == "expert":
+            return {"ok": True, "texte": "PROPOSITION 1: x", "journal": []}
+        if len(appels_lancer) == 1:
+            return {"ok": True, "texte": "BRANCHE 1: A\nBRANCHE 2: B", "journal": []}
+        return {"ok": True, "texte": "x" * 9000, "journal": []}  # grosse recherche réelle
+
+    monkeypatch.setattr(ponts, "lancer", faux_lancer)
+    boucle_ponts.deepseek_exploration_puis_expert("q", lambda b: b, lambda m: m)
+
+    prompt_expert = appels_lancer[-1]
+    assert len(prompt_expert) < 10000  # 2 branches x 2500 tronqués, pas 2 x 9000
+
+
 def test_echec_dune_branche_nempeche_pas_les_autres(monkeypatch):
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
     appels = {"n": 0}

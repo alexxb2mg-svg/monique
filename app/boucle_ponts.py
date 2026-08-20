@@ -197,8 +197,12 @@ def deepseek_exploration_puis_expert(
         recherches.append(r["texte"] if r["ok"] else f"(échec exploration de : {branche})")
 
     ponts.nouvelle_conversation("deepseek")  # fraîche AVANT de basculer en expert
+    # Bug réel (20/08/2026) : sans troncature, 5 branches x jusqu'à 9000 car. de recherche réelle
+    # produisaient un prompt de 36 289 caractères -> l'appel expert a ÉCHOUÉ (timeout probable),
+    # et tout le matériel accumulé (vraie recherche) était perdu silencieusement (repli sur les
+    # seuls titres de branches). Tronqué à 2500 car. par branche -> prompt final borné et fiable.
     materiel = "\n\n---\n\n".join(
-        f"# Branche : {b}\n{r}" for b, r in zip(branches, recherches)
+        f"# Branche : {b}\n{r[:2500]}" for b, r in zip(branches, recherches)
     )
     r_expert = ponts.lancer(
         "chercheur", construire_prompt_expert(materiel), nom="deepseek", mode="expert"
