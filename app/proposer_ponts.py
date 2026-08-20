@@ -34,10 +34,12 @@ def proposer_a_alex(resultat: dict, dossier: str) -> str:
     horodatage_nom = maintenant.strftime("%Y%m%d_%H%M%S")
     horodatage_lisible = maintenant.strftime("%Y-%m-%d %H:%M:%S")
 
-    # Nettoyage du nom de brique pour le nom de fichier
+    # Nettoyage du nom de brique pour le nom de fichier. Tronqué à 60 car. -- un vrai crash
+    # rencontré le 20/08/2026 : une description de brique de plusieurs centaines de caractères
+    # produisait un nom de fichier de 509 caractères, au-delà de la limite Windows (~255/composant).
     brique_slug = "".join(
         c if c.isalnum() or c in ("-", "_") else "_" for c in brique
-    )
+    )[:60]
     nom_fichier = f"revue_{horodatage_nom}_{brique_slug}_{statut_str}.md"
     chemin_complet = os.path.abspath(os.path.join(dossier, nom_fichier))
 

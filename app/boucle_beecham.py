@@ -175,13 +175,21 @@ def construire_brique_sandbox(brique_desc, dossier_sandbox, index) -> dict:
     tests_ok = ecrire_tests_pour_brique(brique_desc, nom_module, chemin_test)
     if not tests_ok:
         resultat = {"ok": False, "brique": brique_desc, "erreur": "échec écriture des tests"}
-        resultat["proposition_ecrite"] = proposer_ponts.proposer_a_alex(resultat, DOSSIER_PROPOSITIONS)
+        try:
+            resultat["proposition_ecrite"] = proposer_ponts.proposer_a_alex(resultat, DOSSIER_PROPOSITIONS)
+        except Exception:
+            # Une erreur de RAPPORT ne doit JAMAIS faire perdre un résultat de construction (bug réel
+            # 20/08/2026 : un nom de fichier trop long a fait planter tout le pipeline).
+            resultat["proposition_ecrite"] = None
         return resultat
 
     cmd_test = [ponts._PY314, "-m", "pytest", chemin_test, "-v"]
     res = boucle_ponts.orchestrer(brique_desc, chemin_module, cmd_test, max_essais_par_brique=2)
     resultat = {"brique": brique_desc, "chemin_module": chemin_module, "chemin_test": chemin_test, **res}
-    resultat["proposition_ecrite"] = proposer_ponts.proposer_a_alex(resultat, DOSSIER_PROPOSITIONS)
+    try:
+        resultat["proposition_ecrite"] = proposer_ponts.proposer_a_alex(resultat, DOSSIER_PROPOSITIONS)
+    except Exception:
+        resultat["proposition_ecrite"] = None
     return resultat
 
 

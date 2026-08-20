@@ -36,6 +36,26 @@ def test_succes_produit_une_proposition(monkeypatch, tmp_path):
     assert appels[0]["toutes_ok"] is True
 
 
+def test_crash_du_rapport_ne_fait_pas_perdre_le_resultat_de_construction(monkeypatch, tmp_path):
+    """Bug réel (20/08/2026) : proposer_a_alex a levé OSError (nom de fichier trop long) et a fait
+    planter TOUT le pipeline -- un résultat de construction VALIDE (5/5 tests passés) a été perdu.
+    Doit maintenant rester fail-soft : le résultat est renvoyé, proposition_ecrite=None."""
+    monkeypatch.setattr(boucle_beecham, "ecrire_tests_pour_brique", lambda *a, **k: True)
+    monkeypatch.setattr(
+        boucle_beecham.boucle_ponts, "orchestrer", lambda *a, **k: {"toutes_ok": True, "resultats": []}
+    )
+
+    def casse(*a, **k):
+        raise OSError("nom de fichier trop long")
+
+    monkeypatch.setattr(proposer_ponts, "proposer_a_alex", casse)
+
+    res = boucle_beecham.construire_brique_sandbox("brique valide mais rapport casse", str(tmp_path), 1)
+
+    assert res["toutes_ok"] is True  # le résultat de construction n'est PAS perdu
+    assert res["proposition_ecrite"] is None
+
+
 def test_echec_apres_orchestrer_produit_quand_meme_une_proposition(monkeypatch, tmp_path):
     """LE cas qui manquait ce soir : orchestrer échoue -> proposer_a_alex doit quand même tourner."""
     monkeypatch.setattr(boucle_beecham, "ecrire_tests_pour_brique", lambda *a, **k: True)

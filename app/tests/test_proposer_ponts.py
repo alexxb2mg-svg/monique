@@ -43,6 +43,19 @@ def test_nom_de_fichier_horodate_et_lisible(tmp_path):
     assert m.group(1).startswith(time.strftime("%Y%m%d"))
 
 
+def test_description_tres_longue_ne_produit_pas_un_nom_trop_long(tmp_path):
+    """Bug réel (20/08/2026) : une description de brique de plusieurs centaines de caractères
+    produisait un nom de fichier de 509 caractères -> OSError sur Windows (limite ~255/composant)."""
+    description_longue = "Remplacer le scaffold orphelin " * 20  # ~640 caractères
+    resultat = {"brique": description_longue, "ok": True, "essais": 1, "dernier_test": ""}
+
+    chemin = proposer_ponts.proposer_a_alex(resultat, str(tmp_path))
+
+    nom = os.path.basename(chemin)
+    assert len(nom) < 150  # large marge sous la limite Windows (~255)
+    assert os.path.exists(chemin)  # l'écriture a réellement réussi, pas juste le calcul du nom
+
+
 def test_dossier_absent_est_cree(tmp_path):
     dossier = str(tmp_path / "sous_dossier_inexistant")
     resultat = {"brique": "X", "ok": True, "essais": 1, "dernier_test": ""}
