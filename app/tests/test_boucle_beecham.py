@@ -67,7 +67,7 @@ def test_planifier_beecham_parse_les_propositions(monkeypatch):
     synthétise, cf. boucle_ponts.deepseek_explore_gemini_synthetise."""
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
 
-    def faux_lancer(role, prompt, nom=None, mode=None):
+    def faux_lancer(role, prompt, nom=None, mode=None, timeout_s=None):
         if nom == "gemini":
             return {"ok": True, "texte": "PROPOSITION 1: faire A\nPROPOSITION 2: faire B", "journal": []}
         return {"ok": True, "texte": "BRANCHE 1: sujet A\nBRANCHE 2: sujet B", "journal": []}

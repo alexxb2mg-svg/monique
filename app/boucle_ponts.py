@@ -198,7 +198,12 @@ def deepseek_explore_gemini_synthetise(
     materiel = "\n\n---\n\n".join(  # PAS de troncature : la fenêtre de Gemini tient l'ensemble
         f"# Branche : {b}\n{r}" for b, r in zip(branches, recherches)
     )
-    r_synth = ponts.lancer("chercheur", construire_prompt_synthese(materiel), nom="gemini")
+    # timeout_s allongé : matériel volumineux (plusieurs branches détaillées) -> génération plus
+    # longue que le défaut de 120s. Bug réel 20/08/2026 : 2 échecs consécutifs (DeepSeek Expert PUIS
+    # Gemini) sur des prompts d'environ 36 000 caractères, probablement par manque de temps.
+    r_synth = ponts.lancer(
+        "chercheur", construire_prompt_synthese(materiel), nom="gemini", timeout_s=240
+    )
     return {
         "branches": branches,
         "recherches": recherches,

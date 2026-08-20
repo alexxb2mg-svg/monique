@@ -13,7 +13,7 @@ def test_chaine_complete_deepseek_explore_gemini_synthetise(monkeypatch):
 
     appels_lancer = []
 
-    def faux_lancer(role, prompt, nom=None, mode=None):
+    def faux_lancer(role, prompt, nom=None, mode=None, timeout_s=None):
         appels_lancer.append({"prompt": prompt, "nom": nom, "mode": mode})
         if nom == "gemini":
             return {"ok": True, "texte": "PROPOSITION 1: synthese finale", "journal": []}
@@ -45,7 +45,7 @@ def test_materiel_non_tronque_avant_gemini(monkeypatch):
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
     appels_lancer = []
 
-    def faux_lancer(role, prompt, nom=None, mode=None):
+    def faux_lancer(role, prompt, nom=None, mode=None, timeout_s=None):
         appels_lancer.append(prompt)
         if nom == "gemini":
             return {"ok": True, "texte": "PROPOSITION 1: x", "journal": []}
@@ -62,7 +62,7 @@ def test_materiel_non_tronque_avant_gemini(monkeypatch):
 
 def test_echec_identification_branches_arrete_tout(monkeypatch):
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
-    monkeypatch.setattr(ponts, "lancer", lambda role, prompt, nom=None, mode=None: {"ok": False, "texte": "", "journal": []})
+    monkeypatch.setattr(ponts, "lancer", lambda role, prompt, nom=None, mode=None, timeout_s=None: {"ok": False, "texte": "", "journal": []})
 
     res = boucle_ponts.deepseek_explore_gemini_synthetise("q", lambda b: b, lambda m: m)
 
@@ -73,7 +73,7 @@ def test_echec_identification_branches_arrete_tout(monkeypatch):
 def test_aucune_branche_parsee_arrete_tout(monkeypatch):
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
     monkeypatch.setattr(
-        ponts, "lancer", lambda role, prompt, nom=None, mode=None: {"ok": True, "texte": "pas de format attendu", "journal": []}
+        ponts, "lancer", lambda role, prompt, nom=None, mode=None, timeout_s=None: {"ok": True, "texte": "pas de format attendu", "journal": []}
     )
 
     res = boucle_ponts.deepseek_explore_gemini_synthetise("q", lambda b: b, lambda m: m)
@@ -85,7 +85,7 @@ def test_echec_dune_branche_nempeche_pas_les_autres(monkeypatch):
     monkeypatch.setattr(ponts, "nouvelle_conversation", lambda nom: None)
     appels = {"n": 0}
 
-    def faux_lancer(role, prompt, nom=None, mode=None):
+    def faux_lancer(role, prompt, nom=None, mode=None, timeout_s=None):
         appels["n"] += 1
         if nom == "gemini":
             return {"ok": True, "texte": "PROPOSITION 1: x", "journal": []}

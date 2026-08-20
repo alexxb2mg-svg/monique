@@ -219,11 +219,15 @@ def _choisir_pont(nom=None) -> str:
     return min(PONTS, key=lambda n: _dernier_usage.get(n, 0))
 
 
-def lancer(role, consigne, worktree=None, nom=None, mode=None) -> dict:
+def lancer(role, consigne, worktree=None, nom=None, mode=None, timeout_s=120) -> dict:
     """Envoie `consigne` via un pont, au contrat de beecham._lancer_agent (worktree ignoré : texte
     pur). Ouvre le pont au besoin, respecte la cadence, tourne entre les ponts. `nom` force un pont
     (validé). `mode` (ex. DeepSeek : 'expert' pour DeepThink, 'vision' pour l'OCR) sélectionne un
-    mode avant l'envoi si le pont le supporte. Verrou par pont : appels concurrents sérialisés."""
+    mode avant l'envoi si le pont le supporte. `timeout_s` : temps laissé au pont pour répondre
+    (défaut 120s) — à rallonger pour un prompt volumineux (ex. synthèse sur un gros matériel
+    accumulé, cf. bug réel 20/08/2026 : deux échecs `ok=False` sur des prompts de ~36 000
+    caractères, probablement le temps de génération dépassant les 120s par défaut).
+    Verrou par pont : appels concurrents sérialisés."""
     if nom is not None and nom not in PONTS:
         return {"ok": False, "texte": "", "journal": [f"pont inconnu: {nom}"], "session_id": None}
     nom = _choisir_pont(nom)
@@ -255,7 +259,7 @@ def lancer(role, consigne, worktree=None, nom=None, mode=None) -> dict:
         # Pas d'incrément manuel ici : journal_ponts.enregistrer_appel() (plus bas) journalise déjà
         # chaque tentative réelle -- c'est CE journal, persisté, qui nourrit le plafond du dessus.
         cfg = PONTS[nom]
-        cmd_sender = [cfg["python"], cfg["sender"], "--message", consigne, "--timeout", "120"]
+        cmd_sender = [cfg["python"], cfg["sender"], "--message", consigne, "--timeout", str(timeout_s)]
         if mode and mode in cfg.get("modes", {}):  # ex. DeepSeek : instant | expert | vision
             cmd_sender += ["--mode", cfg["modes"][mode]]
         try:
@@ -265,7 +269,7 @@ def lancer(role, consigne, worktree=None, nom=None, mode=None) -> dict:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=240,
+                timeout=timeout_s + 60,  # marge : ne pas tuer le sender pile à son propre timeout
             )
         except Exception as e:
             journal_ponts.enregistrer_appel(nom, role, False, len(consigne), 0)
