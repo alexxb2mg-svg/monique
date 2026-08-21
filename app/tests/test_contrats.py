@@ -48,3 +48,47 @@ def test_valider_action_non_dict_refuse():
     res, raison = contrats.valider("pas un dict")
     assert res is False
     assert "dictionnaire" in raison
+
+
+def test_coherence_financiere_ok():
+    assert contrats.valider({"total_ht": 100.0, "taux_tva": 0.2, "total_ttc": 120.0}) == (True, "")
+
+
+def test_coherence_financiere_tolerance_arrondi_ok():
+    # écart d'arrondi réel (flottant), doit passer sous la tolérance de 0.01
+    assert contrats.valider({"total_ht": 33.33, "taux_tva": 0.2, "total_ttc": 39.996})[0] is True
+
+
+def test_coherence_financiere_ecart_reel_refuse():
+    res, raison = contrats.valider({"total_ht": 100.0, "taux_tva": 0.2, "total_ttc": 150.0})
+    assert res is False
+    assert "Incohérence financière" in raison
+
+
+def test_coherence_financiere_champs_absents_ignore_le_controle():
+    # ni verrou d'envoi ni cle financiere -> passe (rien a valider sous cet angle)
+    assert contrats.valider({"total_ht": 100.0}) == (True, "")
+
+
+def test_coherence_financiere_bool_ne_compte_pas_comme_numerique():
+    # piege Python : isinstance(True, int) est True -- ne doit pas etre traite comme un nombre
+    assert contrats.valider({"total_ht": True, "taux_tva": 0.2, "total_ttc": 1.2}) == (True, "")
+
+
+def test_coherence_financiere_et_verrou_envoi_combines():
+    # un devis envoye par email : verrou d'envoi respecte (is_draft=True), mais chiffres faux
+    # -> doit quand meme etre refuse, sur le controle financier cette fois
+    res, raison = contrats.valider(
+        {"type": "email", "is_draft": True, "total_ht": 100.0, "taux_tva": 0.2, "total_ttc": 150.0}
+    )
+    assert res is False
+    assert "Incohérence financière" in raison
+
+
+def test_verrou_envoi_verifie_avant_coherence_financiere():
+    # sans verrou d'envoi ET avec des chiffres faux : le verrou d'envoi doit bloquer en premier
+    res, raison = contrats.valider(
+        {"type": "email", "total_ht": 100.0, "taux_tva": 0.2, "total_ttc": 150.0}
+    )
+    assert res is False
+    assert "envoi externe" in raison
