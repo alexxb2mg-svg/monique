@@ -480,6 +480,16 @@ def _bloc_contexte_canal(messages, fil) -> str:
     return "\n\n".join(blocs) + "\n\n" if blocs else ""
 
 
+_CONSIGNE_RAPPORT = (
+    "\n\nTERMINE ta réponse par un rapport aux QUATRE rubriques suivantes, chacune sur sa propre "
+    "ligne et non vide (c'est vérifié automatiquement à la fin de ta session ; un rapport "
+    "incomplet te sera renvoyé) :\n"
+    "FAIT : ce que tu as fait\n"
+    "RESULTAT : ce que ça donne\n"
+    "FICHIERS : les fichiers que tu as modifiés (ou « aucun »)\n"
+    "PROBLEMES : ce qui a bloqué ou reste à faire (ou « aucun »)"
+)
+
 _CONSIGNE_COURRIER_SORTANT = (
     "\n\nPour ÉCRIRE à un autre agent (tu n'as pas de shell, donc c'est par fichier) : dépose un "
     "fichier JSON dans le dossier `courrier_sortant/` à la racine de ta copie isolée, au format "
@@ -519,7 +529,47 @@ def _archiver_canal(role, messages) -> None:
         pass
 
 
-def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
+def _porte_rapport(role, texte, worktree, session_id, journal, _relancer) -> tuple[str, list]:
+    """PORTE DE SORTIE (D-15) : le rapport de fin de mission doit porter les 4 rubriques imposées.
+
+    Le contrôle vit ICI, dans le code, et non dans l'espoir que la consigne du prompt ait été
+    suivie. Sur non-conformité, l'agent est renvoyé à sa propre session (`--resume`, donc sans
+    perdre son contexte de travail) avec le motif exact du refus.
+
+    UNE seule relance : un rapport mal formé ne doit pas faire perdre un travail qui, lui, peut
+    être bon. Si la relance échoue aussi, on laisse passer avec une marque explicite au journal
+    plutôt que de jeter la mission — la porte signale, elle ne détruit pas.
+    """
+    import contrats
+
+    conforme, raison = contrats.valider_rapport_mission(texte)
+    if conforme:
+        return texte, journal
+
+    if not _relancer or not session_id:
+        journal.append(f"{role} · rapport non conforme, non relancé ({raison})")
+        return texte, journal
+
+    journal.append(f"{role} · rapport refusé par la porte de sortie ({raison}) -> relance")
+    seconde = _lancer_agent(
+        role,
+        f"Ton rapport de fin de mission a été refusé : {raison}\n"
+        "Ne refais AUCUN travail — le code que tu as écrit est conservé. Réponds UNIQUEMENT par le "
+        "rapport complet, aux quatre rubriques." + _CONSIGNE_RAPPORT,
+        worktree,
+        reprendre=session_id,
+        _relancer_rapport=False,  # une seule relance : pas de boucle
+    )
+    journal += seconde.get("journal", [])
+    texte_2 = seconde.get("texte", "")
+    conforme_2, raison_2 = contrats.valider_rapport_mission(texte_2)
+    if conforme_2:
+        return texte_2, journal
+    journal.append(f"{role} · rapport toujours non conforme après relance ({raison_2})")
+    return texte_2 or texte, journal
+
+
+def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=True) -> dict:
     """Session codeur SCOPÉE : Read/Edit/Write only (pas de Bash), cwd=worktree, aucun MCP.
     `reprendre`=<session_id> : REPREND la session claude précédente (`--resume`) au lieu d'en
     rallumer une à froid — l'agent garde sa mémoire de travail (tours de correction) et le cache
@@ -558,7 +608,9 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
             "Si ta consigne te demande d'écrire dans l'atelier partagé (ex. atelier/connaissances/...), "
             f"utilise le CHEMIN ABSOLU suivant, jamais un chemin relatif : {ATELIER.resolve()} — un "
             "chemin relatif atelier/... depuis ta copie isolée écrirait dans un dossier jetable, "
-            "invisible et détruit à la fin de la mission." + _CONSIGNE_COURRIER_SORTANT
+            "invisible et détruit à la fin de la mission."
+            + _CONSIGNE_COURRIER_SORTANT
+            + _CONSIGNE_RAPPORT
         ).replace(
             "\x00", ""
         )  # anti-octet-nul (Windows CreateProcess refuse \x00 -> ValueError)
@@ -671,6 +723,14 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
                     texte += bloc.get("text", "")
         elif ev.get("type") == "result":
             texte = ev.get("result", texte)
+    # PORTE DE SORTIE : le rapport passe le contrôle de format, ou l'agent est renvoyé le refaire.
+    # Seulement sur une mission menée à son terme (rc==0) et à froid : relancer le rapport d'une
+    # session déjà en échec n'apporterait rien.
+    if rc == 0 and reprendre is None:
+        texte, journal = _porte_rapport(
+            role, texte, worktree, session_id, journal, _relancer_rapport
+        )
+
     _archiver_canal(role, courrier_releve)  # D-15 : le courrier lu ne revient pas au tour suivant
     envois = _collecter_canal(role, worktree)  # ...et ce que l'agent a écrit part vers les autres
     if envois["deposes"] or envois["fil"] or envois["rejetes"]:

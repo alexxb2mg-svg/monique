@@ -138,6 +138,45 @@ def valider(action: dict) -> tuple[bool, str]:
     return True, ""
 
 
+# Rubriques imposées au rapport de fin de mission. Format repris d'Hermes Agent (leur contrat de
+# sortie de sous-agent : "tasks performed, results found, files modified, issues encountered"),
+# plutôt qu'inventé ici — c'est un format éprouvé en production ailleurs.
+RUBRIQUES_RAPPORT = ("FAIT", "RESULTAT", "FICHIERS", "PROBLEMES")
+
+# Parsing TOLÉRANT (leçon reference_ponts_format_parsable, apprise sur un bug réel) : le texte
+# d'un LLM arrive avec des décorations imprévisibles — puces, gras markdown, accents, deux-points
+# ou tiret. On absorbe les décorations AVANT et APRÈS le mot-clé (`**FAIT**`), mais jamais un saut
+# de ligne : `[ \t]*` et non `\s*` après le séparateur, sinon une rubrique laissée vide aspirerait
+# la ligne suivante et passerait pour remplie (bug réel, attrapé au test avant livraison).
+_MOTIF_RUBRIQUE = "(?mi)^[^\\w\\n]*{}[^\\w\\n]*[:\\-][ \\t]*(.+)$"
+
+
+def valider_rapport_mission(texte: str) -> tuple[bool, str]:
+    """PORTE DE SORTIE : un rapport de fin de mission doit porter les 4 rubriques, non vides.
+
+    Cette porte ne peut pas *forcer* un agent à produire le bon format — aucun code ne le peut.
+    Ce qu'elle fait, c'est ne pas le laisser passer : l'appelant relance l'agent avec le motif
+    exact. La consigne de format vit dans le prompt (on ne peut pas la deviner), mais la garantie
+    vit ici, dans le code — pas dans l'espoir que le prompt ait été suivi.
+
+    Renvoie (True, "") si conforme, (False, raison citant les rubriques manquantes) sinon.
+    """
+    if not isinstance(texte, str) or not texte.strip():
+        return False, "Rapport vide."
+
+    manquantes = []
+    for rubrique in RUBRIQUES_RAPPORT:
+        # accents optionnels : PROBLEMES doit matcher PROBLÈMES, RESULTAT doit matcher RÉSULTAT
+        souple = rubrique.replace("E", "[EÉÈÊ]").replace("A", "[AÀÂ]")
+        trouve = re.search(_MOTIF_RUBRIQUE.format(souple), texte)
+        if not trouve or not trouve.group(1).strip():
+            manquantes.append(rubrique)
+
+    if manquantes:
+        return False, "Rubrique(s) manquante(s) ou vide(s) : " + ", ".join(manquantes)
+    return True, ""
+
+
 def _normaliser_texte(texte: str) -> str:
     """Minuscules, sans accents, espaces réduits — pour comparer un message à des formulations
     canoniques quelle que soit sa graphie d'arrivée."""
