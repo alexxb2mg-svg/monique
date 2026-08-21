@@ -263,3 +263,14 @@ button.cb:active{transform:translateY(0)}
   .moniquecard .mavatar{width:64px;height:64px;border-radius:12px}
   .menubtn{width:38px;height:38px}
 }
+
+/* Dire à Monique — point d'entrée unique de l'accueil (D-15 / vision produit) */
+.dire{display:flex;gap:10px;align-items:flex-end;margin:14px 0 2px;max-width:56ch}
+.dire textarea{flex:1;font:inherit;font-size:15px;line-height:1.45;color:var(--encre);
+  background:var(--papier);border:1px solid var(--regle);border-radius:10px;padding:11px 13px;
+  resize:vertical;min-height:52px}
+.dire textarea:focus{outline:none;border-color:var(--secu);box-shadow:0 0 0 3px var(--secudoux)}
+.dire button{font:inherit;font-weight:700;font-size:14px;color:#fff;background:var(--encre);
+  border:0;border-radius:10px;padding:13px 20px;cursor:pointer;white-space:nowrap}
+.dire button:hover{background:var(--secu)}
+.dire button:disabled{opacity:.5;cursor:progress}

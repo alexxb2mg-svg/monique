@@ -1,4 +1,11 @@
 <p class="brief">{{ brief.phrase }}</p>
+
+<form class="dire" hx-post="/intention" hx-target="#vue" hx-disabled-elt="find button">
+  <textarea name="intention" rows="2" required
+            placeholder="Dites à Monique ce qu'il faudrait faire — elle décide qui s'en occupe."></textarea>
+  <button type="submit">Lancer</button>
+</form>
+
 <div class="rupture"></div>
 <p class="besoin-titre">Ce qui a besoin de toi maintenant</p>
 <div class="cartesbrief">

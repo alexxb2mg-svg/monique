@@ -593,6 +593,27 @@ def rejeter_mission_beecham(request: Request, mid: str):
     return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
 
 
+@app.post("/intention", response_class=HTMLResponse)
+def intention(request: Request, intention: str = Form(...)):
+    """Point d'entrée unique : Alex dit ce qu'il faudrait faire, Monique décide qui s'en occupe.
+
+    L'intention part au rôle `chef` — l'orchestrateur — et non à un persona choisi à la main.
+    C'est le patron d'Hermes Agent, vérifié dans leur doc avant de coder : pas de routage nommé
+    côté utilisateur, l'agent principal reçoit tout et délègue lui-même quand ça a du sens.
+
+    Réutilise tel quel le mécanisme éprouvé de `/beecham/mission` (thread de fond + suivi HTMX) :
+    la seule chose qui change ici, c'est qu'il n'y a plus de rôle à choisir.
+    """
+    texte = (intention or "").strip()
+    if not texte:
+        return tpl.TemplateResponse(request, "vue_jour.html", {"brief": brief.construire()})
+    mid = beecham.demarrer_mission(texte)
+    threading.Thread(
+        target=beecham.executer_mission, args=(mid, "chef"), daemon=True
+    ).start()
+    return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
+
+
 @app.get("/", response_class=HTMLResponse)
 def racine(request: Request):
     # revue red-team H3 : plus de pré-rendu réinjecté en |safe — include autoéchappé côté coquille
