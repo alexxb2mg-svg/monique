@@ -92,3 +92,44 @@ def test_verrou_envoi_verifie_avant_coherence_financiere():
     )
     assert res is False
     assert "envoi externe" in raison
+
+
+_ACTION_BASE = {"type": "email", "is_draft": True}
+
+
+def test_vouvoiement_tutoiement_isole_refuse():
+    for texte in [
+        "Tu recevras le devis",
+        "Ton chantier avance",
+        "As-tu vu le document",
+        "Je t'informe du retard",
+        "C'est pour toi",
+        "Voici tes documents",
+        "Ta demande est prise en compte",
+    ]:
+        res, raison = contrats.valider({**_ACTION_BASE, "texte": texte})
+        assert res is False, f"aurait du refuser : {texte!r}"
+        assert "Tutoiement" in raison
+
+
+def test_vouvoiement_faux_positifs_ne_sont_pas_bloques():
+    for texte in [
+        "Le statut de votre dossier a change",
+        "Un tutoriel explicatif est joint",
+        "Merci de votre vertu de patience",
+        "La situation actuelle du chantier",
+        "Vous recevrez le devis sous 48h",
+        "Votre chantier avance bien",
+    ]:
+        assert contrats.valider({**_ACTION_BASE, "texte": texte}) == (
+            True,
+            "",
+        ), f"n'aurait pas du refuser : {texte!r}"
+
+
+def test_vouvoiement_ignore_hors_envoi_externe():
+    # pas un envoi externe -> le controle vouvoiement ne s'applique pas
+    assert contrats.valider({"type": "note_interne", "texte": "Tu dois vérifier ça"}) == (
+        True,
+        "",
+    )

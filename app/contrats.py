@@ -6,19 +6,23 @@ atelier/connaissances/proposition_d15_consolidee.md, addendum 5.
 Construit via le pipeline pont (Gemini implémente, DeepSeek relit les tests) le 21/08/2026,
 promu depuis atelier/sandbox_contrat_donnees/."""
 
+import re
+
 TYPES_ENVOI_EXTERNE = {"email", "sms", "whatsapp", "telegram", "envoi_externe"}
 
 
 def valider(action: dict) -> tuple[bool, str]:
     """Valide qu'une action respecte les contrats de sécurité de Monique.
 
-    Contrôles effectués :
+    Contrôles effectués, dans l'ordre (refuse au premier problème trouvé) :
     1. Verrou d'envoi : pour les actions d'envoi externe (email, sms, whatsapp, telegram,
        envoi_externe), au moins un verrou de sécurité doit être actif : `is_draft=True` ou
        `requires_human_validation=True`.
     2. Cohérence financière : si les clés `total_ht`, `taux_tva` et `total_ttc` sont toutes
        présentes et numériques, vérifie que `total_ht + (total_ht * taux_tva)` est égal à
        `total_ttc` à 0.01 près.
+    3. Vouvoiement strict : pour les envois externes, si une clé `texte` (str) est présente,
+       refuse tout tutoiement isolé (tu, ton, ta, tes, toi, te, t').
 
     Args:
         action: Dictionnaire décrivant l'action à exécuter.
@@ -64,6 +68,21 @@ def valider(action: dict) -> tuple[bool, str]:
             return (
                 False,
                 f"Incohérence financière : écart de {ecart:.4f} entre total_ht + total_ht * taux_tva et total_ttc.",
+            )
+
+    # 3. Vouvoiement strict
+    if type_action in TYPES_ENVOI_EXTERNE and isinstance(action.get("texte"), str):
+        texte = action["texte"]
+        # "t" isolé n'est jamais un vrai pronom en français (l'élision donne "t'", jamais un "t"
+        # nu) -- l'exclure de l'alternance \b...\b évite un faux positif rare (taille "T",
+        # initiale). Le cas "t'" reste couvert séparément.
+        motif_tutoiement = re.compile(r"\b(tu|ton|ta|tes|toi|te)\b|\bt'", re.IGNORECASE)
+        match = motif_tutoiement.search(texte)
+        if match:
+            mot_trouve = match.group(0).lower()
+            return (
+                False,
+                f"Tutoiement détecté dans le texte : '{mot_trouve}'.",
             )
 
     return True, ""
