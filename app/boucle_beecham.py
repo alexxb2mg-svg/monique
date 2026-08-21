@@ -217,7 +217,13 @@ def construire_brique_sandbox(brique_desc, dossier_sandbox, index) -> dict:
 
     cmd_test = [ponts._PY314, "-m", "pytest", chemin_test, "-v"]
     res = boucle_ponts.orchestrer(brique_desc, chemin_module, cmd_test, max_essais_par_brique=2)
-    resultat = {"brique": brique_desc, "chemin_module": chemin_module, "chemin_test": chemin_test, **res}
+    resultat = {
+        "brique": brique_desc,
+        "chemin_module": chemin_module,
+        "chemin_test": chemin_test,
+        "ok": res["toutes_ok"],  # proposer_a_alex lit "ok" ; orchestrer() ne renvoie que "toutes_ok"
+        **res,
+    }
     try:
         resultat["proposition_ecrite"] = proposer_ponts.proposer_a_alex(resultat, DOSSIER_PROPOSITIONS)
     except Exception:

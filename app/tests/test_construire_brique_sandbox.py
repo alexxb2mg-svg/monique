@@ -34,6 +34,9 @@ def test_succes_produit_une_proposition(monkeypatch, tmp_path):
     assert res["proposition_ecrite"] == "chemin.md"
     assert len(appels) == 1
     assert appels[0]["toutes_ok"] is True
+    # proposer_a_alex lit la clé "ok" (pas "toutes_ok") pour étiqueter succès/échec du rapport —
+    # bug réel 21/08/2026 : la clé manquait, tout succès était étiqueté ÉCHEC dans le nom de fichier.
+    assert appels[0]["ok"] is True
 
 
 def test_crash_du_rapport_ne_fait_pas_perdre_le_resultat_de_construction(monkeypatch, tmp_path):
