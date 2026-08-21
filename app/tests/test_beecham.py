@@ -1,6 +1,8 @@
 import subprocess
 from pathlib import Path
 
+import pytest
+
 import beecham
 import entrepot
 
@@ -515,5 +517,20 @@ def test_role_vision_existe_et_est_scope():
 def test_role_fournisseurs_materiel_existe_et_est_scope():
     assert "fournisseurs_materiel" in beecham.ROLES
     assert "Approvisionnement" in beecham.ROLES["fournisseurs_materiel"]
+
+
+def test_ecrire_garde_leve_si_fichiers_absents(monkeypatch, tmp_path):
+    """D-15 M1 : le garde-fou ne se regenere plus depuis le depot -- absence = echec explicite,
+    jamais une regeneration silencieuse depuis du code versionne."""
+    monkeypatch.setattr(beecham, "GARDE_DIR", tmp_path / "inexistant")
+    with pytest.raises(RuntimeError, match="Garde-fou absent"):
+        beecham._ecrire_garde()
+
+
+def test_ecrire_garde_renvoie_settings_si_deja_present(monkeypatch, tmp_path):
+    (tmp_path / "garde.py").write_text("# garde", encoding="utf-8")
+    (tmp_path / "settings.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(beecham, "GARDE_DIR", tmp_path)
+    assert beecham._ecrire_garde() == tmp_path / "settings.json"
 
     assert beecham._OUTILS["fournisseurs_materiel"] == "Read,Glob,Grep,Write,WebFetch"

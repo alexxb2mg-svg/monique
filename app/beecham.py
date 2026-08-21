@@ -136,70 +136,23 @@ GARDE_DIR = (
     RACINE.parent / ".beecham_garde"
 )  # substrat hors dépôt : hors de portée des agents
 
-_GARDE_PY = '''#!/usr/bin/env python3
-"""Garde-fou d'ecriture de Beecham (hook PreToolUse). NE PAS EDITER (hors depot).
-Refuse toute ecriture hors des zones BEECHAM_ZONES (os.pathsep). Deny-by-default."""
-import json, os, sys
-
-def _autorise(chemin, zones):
-    try:
-        cible = os.path.normcase(os.path.realpath(chemin))
-    except Exception:
-        return False
-    for z in zones:
-        if not z:
-            continue
-        base = os.path.normcase(os.path.realpath(z))
-        if cible == base or cible.startswith(base + os.sep):
-            return True
-    return False
-
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    print("garde-fou: entree illisible -> refus", file=sys.stderr)
-    sys.exit(2)
-outil = data.get("tool_name", "")
-if outil not in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
-    sys.exit(0)
-ti = data.get("tool_input") or {}
-fp = ti.get("file_path") or ti.get("notebook_path") or ""
-zones = [z for z in os.environ.get("BEECHAM_ZONES", "").split(os.pathsep) if z]
-if not _autorise(fp, zones):
-    raison = ("REFUSE: ecriture hors zone autorisee (%s). Seuls la branche de code et "
-              "l'atelier sont accessibles en ecriture. La production ne se touche jamais." % fp)
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
-          "permissionDecision": "deny", "permissionDecisionReason": raison}}))
-    print(raison, file=sys.stderr)
-    sys.exit(2)
-sys.exit(0)
-'''
+# D-15 M1 (2026-08-22) : le contenu du garde-fou n'est PLUS ici. Il vivait auparavant dans une
+# constante _GARDE_PY régénérée à chaque lancement de mission par _ecrire_garde() — donc dans la
+# zone d'écriture normale d'une mission développeur, qui aurait pu, une fois fusionnée, affaiblir
+# silencieusement sa propre protection au lancement suivant. Le garde-fou réel vit maintenant
+# UNIQUEMENT sur disque, hors dépôt, dans GARDE_DIR (garde.py + settings.json), écrit une fois par
+# geste humain. _ecrire_garde() ne fait plus que vérifier sa présence.
 
 
 def _ecrire_garde() -> Path:
-    """Écrit le garde-fou + les settings de hook dans le substrat (HORS dépôt, donc hors des
-    zones où les agents peuvent écrire). Renvoie le chemin du settings pour `claude --settings`."""
-    GARDE_DIR.mkdir(parents=True, exist_ok=True)
     garde = GARDE_DIR / "garde.py"
-    garde.write_text(_GARDE_PY, encoding="utf-8")
     settings = GARDE_DIR / "settings.json"
-    conf = {
-        "hooks": {
-            "PreToolUse": [
-                {
-                    "matcher": "Write|Edit|MultiEdit|NotebookEdit",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": f'python "{garde}"',
-                            "timeout": 30,
-                        }
-                    ],
-                }
-            ]
-        }
-    }
-    settings.write_text(json.dumps(conf), encoding="utf-8")
+    if not garde.is_file() or not settings.is_file():
+        raise RuntimeError(
+            f"Garde-fou absent : {garde} ou {settings} introuvable. "
+            f"L'opérateur humain doit écrire ces fichiers une fois, à la main, hors dépôt, dans {GARDE_DIR}. "
+            f"Ne pas les régénérer depuis le dépôt."
+        )
     return settings
 
 
