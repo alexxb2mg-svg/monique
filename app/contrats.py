@@ -7,8 +7,43 @@ Construit via le pipeline pont (Gemini implémente, DeepSeek relit les tests) le
 promu depuis atelier/sandbox_contrat_donnees/."""
 
 import re
+import unicodedata
 
 TYPES_ENVOI_EXTERNE = {"email", "sms", "whatsapp", "telegram", "envoi_externe"}
+
+# Caractères invisibles servant à cacher du texte dans un message (le nom est cité dans la raison
+# de refus, jamais le caractère lui-même — il est invisible, ça ne servirait à rien).
+# Écrits en échappements \uXXXX volontairement : littéraux, ces caractères seraient invisibles
+# dans le code source lui-même — donc illisibles et inéditables pour un relecteur humain.
+INVISIBLES = {
+    "\u200b": "zero-width space",
+    "\u200c": "zero-width non-joiner",
+    "\u200d": "zero-width joiner",
+    "\ufeff": "zero-width no-break space / BOM",
+    "\u200e": "left-to-right mark",
+    "\u200f": "right-to-left mark",
+    "\u202a": "left-to-right embedding",
+    "\u202b": "right-to-left embedding",
+    "\u202c": "pop directional formatting",
+    "\u202d": "left-to-right override",
+    "\u202e": "right-to-left override",
+}
+
+# Formulations canoniques d'injection de prompt (comparées sur texte normalisé : minuscules, sans
+# accents, espaces réduits — un message peut arriver sans accents).
+INJECTIONS = [
+    "ignore les instructions precedentes",
+    "ignore previous instructions",
+    "ignore all previous",
+    "oublie tout ce qui precede",
+    "disregard previous",
+    "forget your instructions",
+    "nouvelles instructions systeme",
+    "system prompt",
+    "tu es maintenant",
+    "you are now a",
+    "override your instructions",
+]
 
 # Motif IBAN : 2 lettres pays + 2 chiffres + 11 à 30 caractères alphanumériques, espaces UNIQUES
 # tolérés ENTRE les caractères (pas de suppression globale des espaces du texte -- ça fusionnerait
@@ -99,5 +134,38 @@ def valider(action: dict) -> tuple[bool, str]:
                 False,
                 f"Tutoiement détecté dans le texte : '{mot_trouve}'.",
             )
+
+    return True, ""
+
+
+def _normaliser_texte(texte: str) -> str:
+    """Minuscules, sans accents, espaces réduits — pour comparer un message à des formulations
+    canoniques quelle que soit sa graphie d'arrivée."""
+    nfkd = unicodedata.normalize("NFKD", texte)
+    sans_accents = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", sans_accents.lower()).strip()
+
+
+def scanner_message(texte: str) -> tuple[bool, str]:
+    """Scanne le CONTENU d'un message inter-agents avant acceptation dans une boîte.
+
+    Surface distincte de `valider()` : celle-ci contrôle une action que Monique s'apprête à
+    exécuter, celle-là un message entrant qui sera injecté dans le contexte d'un autre agent —
+    deux menaces différentes, deux points de contrôle.
+
+    Refuse (1) tout caractère invisible servant à cacher du texte, (2) toute formulation
+    canonique d'injection de prompt. Renvoie (True, "") si le message est propre.
+    """
+    if not isinstance(texte, str):
+        return False, "Le texte doit être une chaîne de caractères."
+
+    for caractere in texte:
+        if caractere in INVISIBLES:
+            return False, f"Caractère invisible détecté : {INVISIBLES[caractere]}"
+
+    texte_normalise = _normaliser_texte(texte)
+    for motif in INJECTIONS:
+        if motif in texte_normalise:
+            return False, f"Injection de prompt détectée : '{motif}'"
 
     return True, ""
