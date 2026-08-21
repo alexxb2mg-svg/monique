@@ -33,8 +33,10 @@ ATELIER = beecham.ATELIER
 AT = str(ATELIER).replace("\\", "/")
 STOP = ATELIER / "STOP"
 INCIDENTS = ATELIER / "incidents_boucle.jsonl"
-CONCURRENCE = pipelines.CONCURRENCE
-MAX_VAGUES = pipelines.MAX_VAGUES
+# D-15 Phase 1 : passer par les accesseurs, jamais lire les constantes brutes — ils BORNENT une
+# valeur aberrante arrivée par un diff mal relu (pipelines.py est dans la zone d'écriture des
+# missions). Lus à chaque usage plutôt qu'au chargement du module, pour que la borne s'applique
+# même si la valeur change en cours de route.
 
 
 def log(m):
@@ -141,18 +143,23 @@ def planifier(numero):
         "Alex, jamais codée à l'aveugle.\n\n"
         "GRAVE TA DÉCISION : ajoute UNE ligne datée à " + f"{AT}/decisions_direction.md disant ce que tu "
         "décides pour cette vague et POURQUOI — c'est ainsi que tu tiens un cap d'une vague à l'autre.\n\n"
-        f"PUIS DISPATCHE la VAGUE {numero}. Écris SEULEMENT {AT}/file_attente.json : jusqu'à {CONCURRENCE} micro-missions "
+        f"PUIS DISPATCHE la VAGUE {numero}. Écris SEULEMENT {AT}/file_attente.json : jusqu'à {pipelines.concurrence()} micro-missions "
         "PETITES et STRICTEMENT INDÉPENDANTES (fichiers DIFFÉRENTS — deux missions partageant un fichier "
         "ne tournent pas ensemble). Pour CHAQUE : consigne précise, scope VÉRIFIÉ contre l'état réel du "
         "fichier (lis-le), liste EXACTE des fichiers touchés. Backlog épuisé => file VIDE [].\n"
         'Format : [{"agent":"developpeur","consigne":"…","fichiers":["app/x.py","app/tests/test_x.py"]}, …]. '
-        "L'agent ne verra QUE sa consigne."
+        "L'agent ne verra QUE sa consigne.\n"
+        'DÉPENDANCES : si une mission a besoin du RÉSULTAT d\'une autre (ex. l\'une crée un schéma, '
+        'l\'autre écrit la page qui le consomme), ajoute-lui "depend_de":["<consigne de l\'autre>"] '
+        '— même si leurs fichiers sont différents. Si elle touche un état partagé (config globale, '
+        'lockfile, migration), ajoute "etat_partage":true. Une mission ainsi marquée sera exécutée '
+        "SEULE, ce qui est le comportement correct : parallélisée, elle casserait."
     )
     mid = beecham.demarrer_mission(consigne)
     beecham.executer_mission(mid, role="chef")
     try:
         q = json.loads((ATELIER / "file_attente.json").read_text(encoding="utf-8"))
-        return [m for m in q if isinstance(m, dict) and m.get("consigne")][:CONCURRENCE]
+        return [m for m in q if isinstance(m, dict) and m.get("consigne")][:pipelines.concurrence()]
     except Exception as e:
         incident("file_illisible", e)
         return []
@@ -210,16 +217,14 @@ def _clore_mission(m):
 
 
 def executer_vague(missions):
-    # FILE-LOCK : ne garder qu'un sous-ensemble à FICHIERS DISJOINTS (les collisions sont reportées).
-    retenues, pris = [], set()
-    for m in missions:
-        f = set(m.get("fichiers") or ["*"])
-        if "*" in pris or (f & pris):
-            log(f"  reportée (collision fichiers) : {m['consigne'][:45]}")
-            continue
-        retenues.append(m)
-        pris |= f
-    missions = retenues
+    # RÈGLE DES 3 CRITÈRES (D-15) : fichiers disjoints ET pas de dépendance ET pas d'état partagé.
+    # Un seul critère qui manque -> la mission passe SEULE. Le file-lock d'origine ne regardait que
+    # les fichiers, ce qui laissait passer ensemble deux missions dépendantes aux fichiers disjoints.
+    missions, reportees = pipelines.filtrer_vague(missions, pipelines.concurrence())
+    for m in reportees:
+        log(f"  reportée : {m.get('consigne', '')[:45]}")
+    if missions and (missions[0].get("depend_de") or missions[0].get("etat_partage")):
+        log(f"  vague SÉQUENTIELLE (dépendance ou état partagé) : {missions[0]['consigne'][:45]}")
 
     # worktrees EN SÉRIE (git worktree add = verrou partagé)
     prets = []
@@ -280,7 +285,7 @@ def main():
     reconcilier_fantomes()
     vague, vides = 0, 0
     try:
-        while vague < MAX_VAGUES:
+        while vague < pipelines.max_vagues():
             if STOP.exists():
                 log("STOP demandé — Beecham s'arrête proprement (fin de vague).")
                 break
