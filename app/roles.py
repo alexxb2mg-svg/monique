@@ -56,16 +56,34 @@ def parse_role(agent: str) -> dict:
         "departement": meta.get(
             "departement", "Non affecté"
         ),  # org vivante : Beecham fait grandir
+        # `routable: non` = rôle de brigade : il a un prompt comme les autres, mais n'est pas
+        # cible du routage des messages entrants (on ne route pas un mail client vers « veilleur »).
+        "routable": meta.get("routable", ""),
         "corps": corps or DEFAUT,
     }
 
 
-def carte_agents() -> dict:
+def _est_routable(fiche: dict) -> bool:
+    """Un agent est une cible de routage sauf s'il porte `routable: non` en front-matter.
+
+    Les rôles de BRIGADE (chef, auditeur, développeur…) ont un ROLE.md comme les autres — c'est
+    la source unique de leur prompt — mais ils ne sont pas destinataires des messages entrants :
+    on ne route pas un mail client vers « veilleur ». Absent = routable, donc les agents
+    existants ne changent pas de comportement.
+    """
+    return str(fiche.get("routable", "")).strip().lower() not in ("non", "no", "false")
+
+
+def carte_agents(tous: bool = False) -> dict:
+    """Agents ROUTABLES (défaut) : ce que voient le routeur et la nav par département.
+    `tous=True` inclut les rôles de brigade — utilisé pour charger les prompts, pas pour router."""
     out = {}
     if RACINE_AGENTS.exists():
         for d in RACINE_AGENTS.iterdir():
             if (d / "ROLE.md").exists():
-                out[d.name] = parse_role(d.name)
+                fiche = parse_role(d.name)
+                if tous or _est_routable(fiche):
+                    out[d.name] = fiche
     return out
 
 

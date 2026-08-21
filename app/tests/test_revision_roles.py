@@ -40,3 +40,46 @@ def test_audit_marque_les_prompts_sous_le_seuil():
 def test_seuil_ajustable():
     assert all(r["mince"] for r in roles.auditer(seuil=100000))
     assert not any(r["mince"] for r in roles.auditer(seuil=1))
+
+
+# --- source unique : plus aucun prompt en double ------------------------------------------------
+
+
+def test_aucun_prompt_en_dur_dans_beecham():
+    """Le point de la migration : les prompts ne vivent QUE dans les ROLE.md. S'ils
+    réapparaissaient en dur dans beecham.py, la double maintenance reviendrait avec eux."""
+    from pathlib import Path
+
+    source = (Path(__file__).parent.parent / "beecham.py").read_text(encoding="utf-8")
+    assert "Tu es " not in source, "un prompt de rôle est réapparu en dur dans beecham.py"
+
+
+def test_tous_les_roles_viennent_de_leur_role_md():
+    import beecham
+
+    for nom, prompt in beecham.ROLES.items():
+        assert prompt.strip() == roles.charger(nom).strip(), f"{nom} diverge de son ROLE.md"
+
+
+def test_chaque_role_a_un_profil_d_outils():
+    """Sans entrée dédiée, un rôle hérite des outils du développeur (droit d'écriture code) —
+    ce qui serait faux pour un agent qui ne code pas."""
+    import beecham
+
+    assert set(beecham.ROLES) <= set(beecham._OUTILS)
+
+
+def test_les_roles_de_brigade_ne_sont_pas_cibles_de_routage():
+    """Un rôle de brigade a un ROLE.md (c'est son prompt) mais ne doit pas recevoir de message
+    entrant : on ne route pas un mail client vers « veilleur »."""
+    routables = set(roles.carte_agents())
+    for brigade in ("chef", "auditeur", "stratege", "developpeur", "controleur", "veilleur"):
+        assert brigade not in routables, f"{brigade} ne doit pas être une cible de routage"
+
+
+def test_les_agents_metier_restent_routables():
+    """Contrepartie du test précédent : la migration ne doit pas avoir retiré du routage les
+    agents qui y étaient."""
+    routables = set(roles.carte_agents())
+    for metier in ("secretaire", "chercheur", "vision", "vitrine", "documentaliste"):
+        assert metier in routables
