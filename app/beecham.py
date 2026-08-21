@@ -269,6 +269,37 @@ ROLES = {
     "en dur dans le code. Un canal de courrier par agent et un fil de coordination partagé "
     "sont en cours de construction pour la brigade Beecham, pas encore actifs.",
 }
+
+# D-15 Phase 2 : pour tout rôle qui possède un `agents/<nom>/ROLE.md`, LE FICHIER FAIT FOI.
+#
+# Ces prompts vivaient en double — ici et dans le markdown — tenus synchronisés par un test. C'est
+# ce qui rendait toute révision pénible et fautive : il fallait éditer deux endroits à l'identique
+# (un anglicisme est passé le 21/08 en révisant les huit à la main). Désormais, réviser un prompt
+# = éditer un fichier markdown, point.
+#
+# Les rôles SANS ROLE.md (chef, auditeur, stratege, developpeur, controleur, veilleur) restent
+# définis ci-dessus, en dur, inchangés. On ne leur en crée pas : les ROLE.md alimentent aussi
+# `roles.carte_agents()`, qui sert au ROUTAGE des messages entrants et à l'affichage des
+# départements — leur en donner un les ferait apparaître comme cibles de routage, ce qui n'est pas
+# voulu (ce sont des rôles de brigade, pas des destinataires de courrier entrant).
+def _charger_roles_depuis_markdown() -> None:
+    """Écrase l'entrée en dur par le corps du ROLE.md, quand il existe. Silencieux si `roles` est
+    indisponible : un défaut de chargement ne doit pas empêcher la brigade de démarrer — elle
+    tournera sur les prompts en dur, comme avant."""
+    try:
+        import roles as _roles
+
+        for _nom in _roles.carte_agents():
+            if _nom in ROLES:
+                _corps = _roles.charger(_nom).strip()
+                if _corps:
+                    ROLES[_nom] = _corps
+    except Exception:
+        pass
+
+
+_charger_roles_depuis_markdown()
+
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
 _OUTILS = {

@@ -110,7 +110,7 @@ def test_lire_fil_non_lu_base_vide(db_path):
 def test_lister_fil_statut_archive(db_path):
     """Vérifie que lister_fil avec statut='archive' renvoie les entrées archivées."""
     id_1 = poster_fil(db_path, "Agent_A", "Note 1")
-    id_2 = poster_fil(db_path, "Agent_B", "Note 2")
+    poster_fil(db_path, "Agent_B", "Note 2")
 
     archiver_fil(db_path, id_1)
 
@@ -122,7 +122,7 @@ def test_lister_fil_statut_archive(db_path):
 
 def test_cumul_lu_par_plusieurs_agents(db_path):
     """Vérifie que plusieurs agents lisant la même entrée apparaissent tous dans lu_par."""
-    id_1 = poster_fil(db_path, "Agent_A", "Message partagé")
+    poster_fil(db_path, "Agent_A", "Message partagé")
 
     lire_fil_non_lu(db_path, "Agent_X")
     lire_fil_non_lu(db_path, "Agent_Y")

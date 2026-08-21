@@ -78,6 +78,28 @@ def carte_departements() -> dict:
     return out
 
 
+def auditer(seuil: int = 300) -> list[dict]:
+    """Liste les rôles avec la taille de leur corps, les plus minces d'abord.
+
+    Sert à repérer d'un coup d'œil les prompts trop maigres (constat d'Alex le 21/08 : certains
+    ROLE.md tiennent en deux phrases, sans aucun ancrage dans le projet). La taille n'est qu'un
+    indice grossier — un prompt court et précis vaut mieux qu'un long creux — d'où `mince` comme
+    signal à regarder, pas comme verdict.
+    """
+    out = []
+    for nom in sorted(carte_agents()):
+        corps = charger(nom).strip()
+        out.append(
+            {
+                "nom": nom,
+                "departement": carte_agents()[nom].get("departement", ""),
+                "caracteres": len(corps),
+                "mince": len(corps) < seuil,
+            }
+        )
+    return sorted(out, key=lambda r: r["caracteres"])
+
+
 def charger(agent: str) -> str:
     # revue B1 : REMPLACE le charger de Phase 2b. Renvoie le CORPS seul (front-matter retiré),
     # sinon l'en-tête de routage polluerait le system prompt injecté dans cerveau.
