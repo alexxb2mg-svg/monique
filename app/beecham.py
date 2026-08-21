@@ -480,6 +480,29 @@ def _bloc_contexte_canal(messages, fil) -> str:
     return "\n\n".join(blocs) + "\n\n" if blocs else ""
 
 
+_CONSIGNE_COURRIER_SORTANT = (
+    "\n\nPour ÉCRIRE à un autre agent (tu n'as pas de shell, donc c'est par fichier) : dépose un "
+    "fichier JSON dans le dossier `courrier_sortant/` à la racine de ta copie isolée, au format "
+    '{"destinataire": "<nom du rôle>", "sujet": "...", "corps": "..."} — un fichier par message. '
+    'Mets "brigade" en destinataire pour publier dans le fil partagé que tous les agents lisent. '
+    "Ces messages sont collectés automatiquement à la fin de ta session. N'en écris que si tu as "
+    "quelque chose d'utile à transmettre."
+)
+
+
+def _collecter_canal(role, worktree) -> dict:
+    """Collecte ce que l'agent a écrit dans `courrier_sortant/` avant destruction du worktree.
+    Fail-soft : une collecte impossible ne doit pas faire échouer une mission réussie."""
+    import courrier
+
+    try:
+        return courrier.collecter_courrier_sortant(
+            worktree, role, str(DB_COURRIER), str(DB_COORDINATION)
+        )
+    except Exception:
+        return {"deposes": 0, "fil": 0, "rejetes": 0}
+
+
 def _archiver_canal(role, messages) -> None:
     """Archive le courrier relevé une fois la session terminée. Fail-soft.
 
@@ -535,7 +558,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
             "Si ta consigne te demande d'écrire dans l'atelier partagé (ex. atelier/connaissances/...), "
             f"utilise le CHEMIN ABSOLU suivant, jamais un chemin relatif : {ATELIER.resolve()} — un "
             "chemin relatif atelier/... depuis ta copie isolée écrirait dans un dossier jetable, "
-            "invisible et détruit à la fin de la mission."
+            "invisible et détruit à la fin de la mission." + _CONSIGNE_COURRIER_SORTANT
         ).replace(
             "\x00", ""
         )  # anti-octet-nul (Windows CreateProcess refuse \x00 -> ValueError)
@@ -649,6 +672,12 @@ def _lancer_agent(role, consigne, worktree, reprendre=None) -> dict:
         elif ev.get("type") == "result":
             texte = ev.get("result", texte)
     _archiver_canal(role, courrier_releve)  # D-15 : le courrier lu ne revient pas au tour suivant
+    envois = _collecter_canal(role, worktree)  # ...et ce que l'agent a écrit part vers les autres
+    if envois["deposes"] or envois["fil"] or envois["rejetes"]:
+        journal.append(
+            f"{role} · courrier sortant : {envois['deposes']} déposé(s), "
+            f"{envois['fil']} au fil, {envois['rejetes']} rejeté(s)"
+        )
     return {
         "ok": rc == 0,
         "journal": journal,

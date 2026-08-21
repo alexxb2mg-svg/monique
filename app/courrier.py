@@ -168,3 +168,64 @@ def lister_courrier(
 
     conn.close()
     return [dict(row) for row in rows]
+
+
+def collecter_courrier_sortant(
+    worktree, expediteur: str, chemin_db_courrier: str, chemin_db_coordination: str
+) -> dict:
+    """Collecte les messages qu'un agent a écrits pendant sa mission (D-15, sens sortant).
+
+    Un agent Beecham a Write/Edit mais PAS de shell : il ne peut pas appeler une fonction Python.
+    La convention est donc un dépôt de fichiers — il écrit des `.json` dans
+    `<worktree>/courrier_sortant/`, collectés ici en fin de session, avant destruction du worktree.
+
+    Format attendu par fichier : {"destinataire": str, "sujet": str, "corps": str}.
+    `destinataire = "brigade"` publie dans le fil partagé (le `sujet` y est alors facultatif),
+    sinon dépose dans la boîte du destinataire nommé.
+
+    ROBUSTESSE : un agent peut écrire n'importe quoi. Un fichier illisible, au JSON malformé, aux
+    clés manquantes ou au contenu refusé par le scan de sécurité est ignoré et compté en `rejetes`
+    — jamais une exception qui ferait échouer la mission entière pour un message mal formé.
+
+    Les fichiers traités ne sont ni déplacés ni supprimés : le worktree est jetable et détruit
+    juste après.
+
+    Renvoie {"deposes": int, "fil": int, "rejetes": int}.
+    """
+    import json
+    from pathlib import Path
+
+    import coordination
+
+    compteurs = {"deposes": 0, "fil": 0, "rejetes": 0}
+    dossier = Path(worktree) / "courrier_sortant"
+    if not dossier.is_dir():
+        return compteurs
+
+    for fichier in sorted(dossier.glob("*.json")):
+        try:
+            data = json.loads(fichier.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("le JSON doit être un objet")
+
+            destinataire = data.get("destinataire")
+            corps = data.get("corps")
+            sujet = data.get("sujet")
+            if not isinstance(destinataire, str) or not isinstance(corps, str):
+                raise ValueError("destinataire et corps doivent être des chaînes")
+
+            if destinataire == "brigade":
+                coordination.poster_fil(chemin_db_coordination, expediteur, corps)
+                compteurs["fil"] += 1
+            else:
+                if not isinstance(sujet, str):
+                    raise ValueError("sujet requis pour un courrier nominatif")
+                deposer_courrier(chemin_db_courrier, destinataire, expediteur, sujet, corps)
+                compteurs["deposes"] += 1
+        except Exception:
+            # large volontairement : JSON invalide, fichier illisible, encodage cassé, refus du
+            # scan de sécurité, erreur SQLite -- aucun de ces cas ne doit faire échouer la collecte
+            # des AUTRES messages ni la mission.
+            compteurs["rejetes"] += 1
+
+    return compteurs
