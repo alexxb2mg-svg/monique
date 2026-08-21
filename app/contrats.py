@@ -10,11 +10,21 @@ import re
 
 TYPES_ENVOI_EXTERNE = {"email", "sms", "whatsapp", "telegram", "envoi_externe"}
 
+# Motif IBAN : 2 lettres pays + 2 chiffres + 11 à 30 caractères alphanumériques, espaces UNIQUES
+# tolérés ENTRE les caractères (pas de suppression globale des espaces du texte -- ça fusionnerait
+# les mots alentour et casserait la frontière \b sur le cas le plus courant : un IBAN entouré de
+# prose normale avec espaces. Bug réel trouvé et corrigé le 22/08/2026, cf. test dédié).
+_MOTIF_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}\b", re.IGNORECASE)
+
 
 def valider(action: dict) -> tuple[bool, str]:
     """Valide qu'une action respecte les contrats de sécurité de Monique.
 
     Contrôles effectués, dans l'ordre (refuse au premier problème trouvé) :
+    0. Interdiction d'IBAN en clair : si une clé `texte` (str) est présente et contient
+       un motif IBAN (format international, espaces internes tolérés), refuse SANS EXCEPTION
+       et sans jamais citer l'IBAN trouvé dans le message (pour ne pas le faire fuiter).
+       S'applique quel que soit le type de l'action.
     1. Verrou d'envoi : pour les actions d'envoi externe (email, sms, whatsapp, telegram,
        envoi_externe), au moins un verrou de sécurité doit être actif : `is_draft=True` ou
        `requires_human_validation=True`.
@@ -33,6 +43,11 @@ def valider(action: dict) -> tuple[bool, str]:
     """
     if not isinstance(action, dict):
         return False, "L'action doit être un dictionnaire."
+
+    # 0. Interdiction d'IBAN en clair (quel que soit le type d'action)
+    texte_brut = action.get("texte")
+    if isinstance(texte_brut, str) and _MOTIF_IBAN.search(texte_brut):
+        return False, "IBAN détecté dans le texte."
 
     # 1. Verrou d'envoi
     type_action = action.get("type")

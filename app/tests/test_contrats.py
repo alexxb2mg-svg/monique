@@ -133,3 +133,44 @@ def test_vouvoiement_ignore_hors_envoi_externe():
         True,
         "",
     )
+
+
+def test_iban_embarque_dans_du_texte_normal_refuse():
+    # LE cas realiste : IBAN entoure de prose avec espaces -- bug reel trouve et corrige
+    # (suppression globale des espaces cassait la frontiere \b sur ce cas precis)
+    res, raison = contrats.valider(
+        {"texte": "Voici mon IBAN FR7630006000011234567890189 merci"}
+    )
+    assert res is False
+    assert "IBAN" in raison
+
+
+def test_iban_seul_avec_espaces_internes_refuse():
+    res, raison = contrats.valider({"texte": "FR76 3000 6000 0112 3456 7890 189"})
+    assert res is False
+    assert "IBAN" in raison
+
+
+def test_iban_ne_fuite_jamais_dans_la_raison():
+    res, raison = contrats.valider({"texte": "IBAN : FR7630006000011234567890189"})
+    assert res is False
+    assert "FR76" not in raison
+
+
+def test_iban_controle_s_applique_meme_hors_envoi_externe():
+    # meme un brouillon interne (pas de type d'envoi) ne doit jamais contenir d'IBAN en clair
+    res, raison = contrats.valider(
+        {"type": "note_interne", "texte": "IBAN client : FR7630006000011234567890189"}
+    )
+    assert res is False
+    assert "IBAN" in raison
+
+
+def test_iban_faux_positifs_metier_ne_sont_pas_bloques():
+    for texte in [
+        "Le devis D26050007 est prêt",
+        "Référence produit NFT820 disponible",
+        "Code postal 45400 Fleury-les-Aubrais",
+        "Merci de votre confiance, cordialement",
+    ]:
+        assert contrats.valider({"texte": texte}) == (True, ""), f"faux positif sur : {texte!r}"
