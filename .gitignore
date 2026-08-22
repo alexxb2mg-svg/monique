@@ -35,6 +35,8 @@ spillover/
 # republierait à la fin de chaque mission — croissance quadratique du fil injecté en tête de
 # prompt de tous les agents. Bug trouvé par le contrôleur le 22/08/2026, reproduit avant correctif.
 courrier_sortant/
+# Questions d'un agent à son conseil (beecham._porte_consultation) : même raison, même sort.
+questions/
 
 # Journaux & logs : activité de la machine, pas du projet
 *.log
