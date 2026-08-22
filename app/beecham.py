@@ -626,10 +626,18 @@ def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=Tr
     env["BEECHAM_ZONES"] = os.pathsep.join(
         [str(Path(worktree).resolve()), str(ATELIER.resolve())]
     )
+    # Le prompt part par l'ENTRÉE STANDARD, pas en argument de ligne de commande.
+    #
+    # Bug réel du 22/08/2026 : Windows plafonne une ligne de commande à 32 767 caractères
+    # (CreateProcess). Le prompt d'une mission agrège le plan, la mémoire du rôle et la consigne —
+    # une revue générale du chef atteignait 36 000 caractères et échouait sur un
+    # « FileNotFoundError [WinError 206] nom de fichier trop long », message trompeur qui ne dit
+    # rien de la vraie cause. Pire : le plafond se rapprochait à MESURE que la brigade travaillait
+    # (plan.md et les mémoires grossissent), donc le chef était condamné à devenir inlançable.
+    # `claude -p` sans argument lit son prompt sur stdin : plus aucune limite de taille.
     cmd = [
         "claude",
         "-p",
-        prompt,
         "--output-format",
         "stream-json",
         "--verbose",
@@ -659,6 +667,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=Tr
             cmd,
             cwd=str(worktree),
             env=env,
+            stdin=subprocess.PIPE,  # le prompt y est écrit (cf. commentaire sur cmd, WinError 206)
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -685,7 +694,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=Tr
     except Exception:
         pass
     try:
-        stdout, _ = proc.communicate(timeout=1800)
+        stdout, _ = proc.communicate(input=prompt, timeout=1800)
         rc = proc.returncode
     except subprocess.TimeoutExpired:
         try:

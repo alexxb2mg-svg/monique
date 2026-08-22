@@ -358,8 +358,13 @@ def test_chemin_memoire_cree_le_fichier_avec_en_tete(tmp_path, monkeypatch):
     assert "chercheur" in chemin.read_text(encoding="utf-8")
 
 
-def _subprocess_popen_capture(appels):
-    """Remplace beecham.subprocess.Popen : capture `cmd` sans lancer de vrai process."""
+def _subprocess_popen_capture(appels, prompts=None):
+    """Remplace beecham.subprocess.Popen : capture `cmd` sans lancer de vrai process.
+
+    Le prompt ne voyage PLUS dans l'argv mais sur stdin (limite Windows de 32 767 caractères sur
+    une ligne de commande — cf. beecham._lancer_agent). `prompts` collecte donc ce qui est écrit
+    sur l'entrée standard ; utiliser `dernier_prompt()` plutôt que de fouiller `cmd`.
+    """
 
     def faux_popen(cmd, **kwargs):
         appels.append(cmd)
@@ -368,7 +373,9 @@ def _subprocess_popen_capture(appels):
             pid = 424242
             returncode = 0
 
-            def communicate(self, timeout=None):
+            def communicate(self, input=None, timeout=None):
+                if prompts is not None:
+                    prompts.append(input or "")
                 return ("", "")
 
             def kill(self):
@@ -377,6 +384,11 @@ def _subprocess_popen_capture(appels):
         return FauxProc()
 
     return faux_popen
+
+
+def _dernier_prompt(prompts):
+    """Le prompt réellement envoyé à `claude` (ignore les appels d'autres outils)."""
+    return prompts[-1] if prompts else ""
 
 
 def test_lancer_agent_injecte_plan_et_memoire(tmp_path, monkeypatch):
@@ -393,14 +405,15 @@ def test_lancer_agent_injecte_plan_et_memoire(tmp_path, monkeypatch):
 
     monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
     monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
-    appels = []
-    monkeypatch.setattr(beecham.subprocess, "Popen", _subprocess_popen_capture(appels))
+    appels, prompts = [], []
+    monkeypatch.setattr(
+        beecham.subprocess, "Popen", _subprocess_popen_capture(appels, prompts)
+    )
 
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 
     assert len(appels) == 1
-    cmd = appels[0]
-    prompt = cmd[cmd.index("-p") + 1]
+    prompt = _dernier_prompt(prompts)
     assert "PLAN-CONNU : refonte du module X" in prompt
     assert "MEMOIRE-CONNUE : piège déjà rencontré Y" in prompt
     assert "fais X" in prompt
@@ -415,14 +428,15 @@ def test_lancer_agent_sans_plan_ni_memoire_ne_casse_pas(tmp_path, monkeypatch):
 
     monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
     monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
-    appels = []
-    monkeypatch.setattr(beecham.subprocess, "Popen", _subprocess_popen_capture(appels))
+    appels, prompts = [], []
+    monkeypatch.setattr(
+        beecham.subprocess, "Popen", _subprocess_popen_capture(appels, prompts)
+    )
 
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 
     assert len(appels) == 1
-    cmd = appels[0]
-    prompt = cmd[cmd.index("-p") + 1]
+    prompt = _dernier_prompt(prompts)
     assert "fais X" in prompt
 
 
@@ -438,14 +452,15 @@ def test_lancer_agent_indique_chemin_absolu_atelier(tmp_path, monkeypatch):
 
     monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
     monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
-    appels = []
-    monkeypatch.setattr(beecham.subprocess, "Popen", _subprocess_popen_capture(appels))
+    appels, prompts = [], []
+    monkeypatch.setattr(
+        beecham.subprocess, "Popen", _subprocess_popen_capture(appels, prompts)
+    )
 
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 
     assert len(appels) == 1
-    cmd = appels[0]
-    prompt = cmd[cmd.index("-p") + 1]
+    prompt = _dernier_prompt(prompts)
     assert str(atelier.resolve()) in prompt
 
 

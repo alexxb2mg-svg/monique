@@ -36,7 +36,7 @@ def test_lancer_agent_lit_plan_via_atelier_seul(tmp_path, monkeypatch):
     monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
     monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
 
-    appels = []
+    appels, prompts = [], []
 
     def faux_popen(cmd, **kwargs):
         appels.append(cmd)
@@ -45,7 +45,8 @@ def test_lancer_agent_lit_plan_via_atelier_seul(tmp_path, monkeypatch):
             pid = 424242
             returncode = 0
 
-            def communicate(self, timeout=None):
+            def communicate(self, input=None, timeout=None):
+                prompts.append(input or "")  # le prompt voyage sur stdin, pas dans l'argv
                 return ("", "")
 
             def kill(self):
@@ -58,5 +59,5 @@ def test_lancer_agent_lit_plan_via_atelier_seul(tmp_path, monkeypatch):
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 
     assert len(appels) == 1
-    prompt = appels[0][appels[0].index("-p") + 1]
+    prompt = prompts[-1]
     assert "PLAN-ISOLE : contenu de test" in prompt

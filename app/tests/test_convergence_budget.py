@@ -10,7 +10,7 @@ en session neuve ET en reprise (`--resume`), une session reprise pouvant aussi p
 import beecham
 
 
-def _faux_popen(appels):
+def _faux_popen(appels, prompts=None):
     def faux_popen(cmd, **kwargs):
         appels.append(cmd)
 
@@ -18,7 +18,9 @@ def _faux_popen(appels):
             pid = 424242
             returncode = 0
 
-            def communicate(self, timeout=None):
+            def communicate(self, input=None, timeout=None):
+                if prompts is not None:
+                    prompts.append(input or "")
                 return ("", "")
 
             def kill(self):
@@ -29,9 +31,10 @@ def _faux_popen(appels):
     return faux_popen
 
 
-def _prompt_capture(appels):
-    cmd = appels[0]
-    return cmd[cmd.index("-p") + 1]
+def _prompt_capture(prompts):
+    """Le prompt voyage sur stdin, plus dans l'argv (limite Windows de 32 767 car. sur une ligne
+    de commande — cf. beecham._lancer_agent)."""
+    return prompts[-1] if prompts else ""
 
 
 def _isoler(tmp_path, monkeypatch):
@@ -40,26 +43,26 @@ def _isoler(tmp_path, monkeypatch):
 
     monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
     monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
-    appels = []
-    monkeypatch.setattr(beecham.subprocess, "Popen", _faux_popen(appels))
-    return appels
+    appels, prompts = [], []
+    monkeypatch.setattr(beecham.subprocess, "Popen", _faux_popen(appels, prompts))
+    return prompts
 
 
 def test_convergence_injectee_session_neuve(tmp_path, monkeypatch):
-    appels = _isoler(tmp_path, monkeypatch)
+    prompts = _isoler(tmp_path, monkeypatch)
 
     beecham._lancer_agent("developpeur", "fais X", tmp_path)
 
-    prompt = _prompt_capture(appels)
+    prompt = _prompt_capture(prompts)
     assert "CONVERGENCE" in prompt  # la consigne de budget est bien pré-chargée
     assert "fais X" in prompt  # sans écraser la consigne de mission
 
 
 def test_convergence_injectee_en_reprise(tmp_path, monkeypatch):
-    appels = _isoler(tmp_path, monkeypatch)
+    prompts = _isoler(tmp_path, monkeypatch)
 
     beecham._lancer_agent("developpeur", "corrige Y", tmp_path, reprendre="sess-123")
 
-    prompt = _prompt_capture(appels)
+    prompt = _prompt_capture(prompts)
     assert "CONVERGENCE" in prompt
     assert "corrige Y" in prompt

@@ -59,7 +59,7 @@ def test_le_modele_est_bien_passe_a_la_commande(monkeypatch, tmp_path):
         def __init__(self, cmd, **kw):
             appels.append(cmd)
 
-        def communicate(self, timeout=None):
+        def communicate(self, input=None, timeout=None):
             return "", ""
 
         @property
