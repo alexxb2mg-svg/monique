@@ -515,6 +515,100 @@ _CONSIGNE_COURRIER_SORTANT = (
 )
 
 
+def _consignes_fixes() -> str:
+    """Bloc INVARIANT du prompt de mission : cadre de travail, chemin de l'atelier, courrier
+    sortant, format du rapport. Même texte à chaque lancement, quel que soit le rôle et la
+    consigne. Placé en TÊTE du prompt ; le variable (carte, canal, consigne) vient APRÈS."""
+    return (
+        "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
+        "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
+        "seront lancés automatiquement après toi. Réponds par un court résumé de ce que tu as "
+        "fait.\n\n"
+        "Si ta consigne te demande d'écrire dans l'atelier partagé (ex. atelier/connaissances/...), "
+        f"utilise le CHEMIN ABSOLU suivant, jamais un chemin relatif : {ATELIER.resolve()} — un "
+        "chemin relatif atelier/... depuis ta copie isolée écrirait dans un dossier jetable, "
+        "invisible et détruit à la fin de la mission."
+        + _CONSIGNE_COURRIER_SORTANT
+        + _CONSIGNE_RAPPORT
+        + "\n\n"
+    )
+
+
+# Borne DURE de la carte de contexte, renvoi compris. L'injection intégrale de plan.md + mémoire
+# du rôle coûtait ~9 700 caractères par mission et grossissait à chaque vague (c'est elle qui a
+# fini par rendre le chef inlançable, cf. WinError 206 plus bas). La carte en garde l'essentiel ;
+# l'agent lit les fichiers entiers avec Read s'il en a besoin.
+BORNE_CARTE = 2000
+
+
+def _plan_utile(texte) -> str:
+    """Sections `## ` de plan.md utiles à une mission : celles dont le titre contient « clos »
+    (l'historique) sont écartées. ORDRE DU FICHIER conservé, volontairement : plan.md est déjà
+    curé par le planificateur, qui place la vague en cours en tête. Réordonner ici — par exemple
+    en remontant les sections qui nomment le rôle — ferait passer une grosse section annexe devant
+    la vague, qui serait alors évincée par la troncature (mesuré : `## Départements`, 1 250 car.,
+    nomme le planificateur ; `## Ordre global`, la vague, ne le nomme pas). Un texte sans section
+    `## ` est rendu tel quel."""
+    sections, courante = [], None
+    for ligne in (texte or "").splitlines():
+        if ligne.startswith("## "):
+            courante = [ligne]
+            sections.append(courante)
+        elif courante is not None:
+            courante.append(ligne)
+    gardees = ["\n".join(s).strip() for s in sections if "clos" not in s[0].lower()]
+    return "\n\n".join(gardees) if gardees else texte
+
+
+def _tronquer(texte, budget, queue=False) -> str:
+    """Coupe `texte` à `budget` caractères, sur une frontière de ligne (jamais au milieu d'un
+    mot). `queue=True` garde la FIN : une mémoire de rôle est append-only, ses dernières lignes
+    sont les leçons récentes."""
+    if budget <= 0 or not texte:
+        return ""
+    if len(texte) <= budget:
+        return texte
+    morceau = texte[-budget:] if queue else texte[:budget]
+    if "\n" not in morceau:
+        return morceau
+    return morceau[morceau.index("\n") + 1 :] if queue else morceau[: morceau.rindex("\n")]
+
+
+def _carte_contexte(role) -> str:
+    """Carte de contexte BORNÉE (≤ BORNE_CARTE caractères) : extrait utile de plan.md, dernières
+    leçons de la mémoire du rôle, puis un renvoi vers les fichiers entiers par chemin absolu —
+    l'agent a l'outil Read, il va chercher lui-même ce qui lui manque. Découpage 100 %
+    déterministe, aucun appel de modèle. Fail-soft : un fichier illisible ne fait jamais échouer
+    une mission. `ATELIER` est relu à CHAQUE appel, jamais figé à l'import (régression C3)."""
+    renvoi = (
+        "Ces deux extraits sont TRONQUÉS. Tu peux lire les fichiers entiers (outil Read) :\n"
+        f"- plan de la brigade : {(ATELIER / 'plan.md').resolve()}\n"
+        f"- mémoire de ton rôle : {(ATELIER / 'memoire' / f'{role}.md').resolve()}"
+    )
+    entete_plan = "# Contexte de la brigade (extrait de plan.md)\n"
+    entete_memoire = "# Mémoire de ton rôle (dernières lignes)\n"
+    budget = BORNE_CARTE - len(renvoi) - len(entete_plan) - len(entete_memoire) - 6
+    plan_txt = memoire_txt = ""
+    try:
+        plan_txt = _plan_utile((ATELIER / "plan.md").read_text(encoding="utf-8"))
+    except OSError:
+        pass
+    try:
+        memoire_txt = chemin_memoire(role).read_text(encoding="utf-8")
+    except OSError:
+        pass
+    plan_txt = _tronquer(plan_txt, int(budget * 0.6))
+    memoire_txt = _tronquer(memoire_txt, budget - len(plan_txt), queue=True)
+    blocs = []
+    if plan_txt:
+        blocs.append(entete_plan + plan_txt)
+    if memoire_txt:
+        blocs.append(entete_memoire + memoire_txt)
+    if not blocs:
+        return ""
+    return "\n\n".join(blocs) + "\n\n" + renvoi + "\n\n"
+
+
 def _collecter_canal(role, worktree) -> dict:
     """Collecte ce que l'agent a écrit dans `courrier_sortant/` avant destruction du worktree.
     Fail-soft : une collecte impossible ne doit pas faire échouer une mission réussie."""
@@ -604,33 +698,14 @@ def _lancer_agent(
         # Le canal n'est PAS relevé ici : ce qui a été lu au premier tour est déjà dans la session.
         prompt = (consigne or "").replace("\x00", "")
     else:
-        # Contexte de la brigade : plan.md + mémoire du rôle, en tête. Fail-soft : jamais d'échec ici.
-        contexte = ""
+        # Prompt = invariant d'abord (_consignes_fixes), variable ensuite : carte de contexte
+        # bornée (plan + mémoire), canal, puis la consigne du jour.
         courrier_releve, fil_releve = _relever_canal(role)
-        contexte += _bloc_contexte_canal(courrier_releve, fil_releve)
-        try:
-            plan_txt = (ATELIER / "plan.md").read_text(encoding="utf-8")
-            if plan_txt:
-                contexte += f"# Contexte de la brigade (plan.md)\n{plan_txt}\n\n"
-        except OSError:
-            pass
-        try:
-            memoire_txt = chemin_memoire(role).read_text(encoding="utf-8")
-            if memoire_txt:
-                contexte += f"# Mémoire de ton rôle\n{memoire_txt}\n\n"
-        except OSError:
-            pass
         prompt = (
-            f"{contexte}{consigne}\n\n"
-            "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
-            "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
-            "seront lancés automatiquement après toi. Réponds par un court résumé de ce que tu as fait.\n\n"
-            "Si ta consigne te demande d'écrire dans l'atelier partagé (ex. atelier/connaissances/...), "
-            f"utilise le CHEMIN ABSOLU suivant, jamais un chemin relatif : {ATELIER.resolve()} — un "
-            "chemin relatif atelier/... depuis ta copie isolée écrirait dans un dossier jetable, "
-            "invisible et détruit à la fin de la mission."
-            + _CONSIGNE_COURRIER_SORTANT
-            + _CONSIGNE_RAPPORT
+            _consignes_fixes()
+            + _carte_contexte(role)
+            + _bloc_contexte_canal(courrier_releve, fil_releve)
+            + str(consigne)
         ).replace(
             "\x00", ""
         )  # anti-octet-nul (Windows CreateProcess refuse \x00 -> ValueError)
