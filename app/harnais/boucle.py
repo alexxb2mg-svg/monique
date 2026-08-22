@@ -121,6 +121,35 @@ def _echecs_recents(n=6):
     return "\n".join(out)
 
 
+def _consommer_file(numero):
+    """Lit la file laissée par le chef ET la retire du chemin lu par la vague suivante.
+
+    Sans consommation, une vague dont le chef n'a rien réécrit (cas courant : « livré, rien à
+    fusionner ») relit la file précédente et la rejoue à l'identique — 10 vagues jumelles et
+    40 missions pour rien le 20/08 — et le compteur de tours à vide ne se déclenche jamais.
+    Archivée plutôt que vidée : la trace sert au diagnostic. Si l'archivage échoue (fichier
+    tenu par un autre process), on vide quand même : le rejeu doit être impossible, pas rare."""
+    f = ATELIER / "file_attente.json"
+    if not f.exists():
+        return []
+    try:
+        q = json.loads(f.read_text(encoding="utf-8"))
+    except Exception as e:
+        incident("file_illisible", e)
+        q = []
+    try:
+        f.replace(ATELIER / f"file_attente.{numero}.consommee.json")
+    except OSError as e:
+        incident("file_non_archivee", e)
+        try:
+            f.write_text("[]", encoding="utf-8")
+        except OSError:
+            pass
+    if not isinstance(q, list):
+        return []
+    return [m for m in q if isinstance(m, dict) and m.get("consigne")][:pipelines.concurrence()]
+
+
 def planifier(numero):
     echecs = _echecs_recents()
     consigne = (
@@ -157,12 +186,7 @@ def planifier(numero):
     )
     mid = beecham.demarrer_mission(consigne)
     beecham.executer_mission(mid, role="chef")
-    try:
-        q = json.loads((ATELIER / "file_attente.json").read_text(encoding="utf-8"))
-        return [m for m in q if isinstance(m, dict) and m.get("consigne")][:pipelines.concurrence()]
-    except Exception as e:
-        incident("file_illisible", e)
-        return []
+    return _consommer_file(numero)
 
 
 def _outils_vague():
