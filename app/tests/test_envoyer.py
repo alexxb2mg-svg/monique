@@ -24,6 +24,36 @@ def test_envoyer_staging_n_envoie_rien(tmp_path, monkeypatch):
     assert row["statut"] == "pending"
 
 
+def _obligations(db):
+    con = entrepot.connexion_ecriture(db)
+    try:
+        return con.execute("SELECT COUNT(*) c FROM secw_delivery_obligations").fetchone()[
+            "c"
+        ]
+    finally:
+        con.close()
+
+
+def test_envoyer_refuse_par_contrat_n_ecrit_rien(tmp_path):
+    # un brouillon avec IBAN en clair : le contrat refuse, et surtout AUCUNE obligation
+    # ne doit rester en base (un refus tracé quand même ne servirait à rien).
+    db = _db(tmp_path)
+    overlays.enregistrer_brouillon(
+        11, "gmail", "ctx", "Notre IBAN FR7630001007941234567890185.", [], [], db
+    )
+    r = SA.envoyer_staging(11, db)
+    assert r["ok"] is False and r["erreur"] == "contrat_refuse" and r["raison"]
+    assert _obligations(db) == 0
+
+
+def test_envoyer_refuse_le_tutoiement(tmp_path):
+    db = _db(tmp_path)
+    overlays.enregistrer_brouillon(12, "gmail", "ctx", "Salut, tu passes demain ?", [], [], db)
+    r = SA.envoyer_staging(12, db)
+    assert r["ok"] is False and r["erreur"] == "contrat_refuse"
+    assert _obligations(db) == 0
+
+
 def test_envoyer_sans_brouillon(tmp_path):
     db = _db(tmp_path)
     r = SA.envoyer_staging(42, db)
