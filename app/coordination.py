@@ -72,36 +72,41 @@ def poster_fil(
 def lire_fil_non_lu(
     chemin_db: str, agent_id: str, limite: int = 50
 ) -> list[dict]:
+    """Lecture PURE : renvoie les entrées actives que `agent_id` n'a pas encore marquées lues,
+    sans rien écrire. La consommation est un geste SÉPARÉ (`marquer_lu`), fait une fois la session
+    terminée — sinon une mesure, un test ou une simple inspection du fil brûlerait des messages
+    que personne n'a lus."""
     conn = _get_connection(chemin_db)
-    cursor = conn.execute(
+    rows = conn.execute(
         "SELECT * FROM coordination WHERE statut = 'actif' ORDER BY id ASC"
-    )
-    rows = cursor.fetchall()
+    ).fetchall()
+    conn.close()
+    non_lus = [dict(r) for r in rows if agent_id not in json.loads(r["lu_par"])]
+    return non_lus[:limite]
 
-    resultats = []
-    a_mettre_a_jour = []
 
-    for row in rows:
+def marquer_lu(chemin_db: str, agent_id: str, ids) -> None:
+    """Consomme : ajoute `agent_id` au `lu_par` des entrées `ids`. Une entrée qu'on ne passe pas
+    ici reste non lue et repartira au tour suivant — c'est ce qui permet à un appelant de ne
+    consommer que ce qu'il a réellement montré."""
+    if not ids:
+        return
+    conn = _get_connection(chemin_db)
+    for row_id in ids:
+        row = conn.execute(
+            "SELECT lu_par FROM coordination WHERE id = ?", (row_id,)
+        ).fetchone()
+        if row is None:
+            continue
         lu_par_list = json.loads(row["lu_par"])
         if agent_id not in lu_par_list:
-            d = dict(row)
             lu_par_list.append(agent_id)
-            d["lu_par"] = json.dumps(lu_par_list)
-            resultats.append(d)
-            a_mettre_a_jour.append((d["lu_par"], row["id"]))
-
-            if len(resultats) >= limite:
-                break
-
-    for nouveau_lu_par, row_id in a_mettre_a_jour:
-        conn.execute(
-            "UPDATE coordination SET lu_par = ? WHERE id = ?",
-            (nouveau_lu_par, row_id),
-        )
-
+            conn.execute(
+                "UPDATE coordination SET lu_par = ? WHERE id = ?",
+                (json.dumps(lu_par_list), row_id),
+            )
     conn.commit()
     conn.close()
-    return resultats
 
 
 def lister_fil(
