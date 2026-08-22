@@ -243,6 +243,34 @@ mail client vers « veilleur ».
 
 # Profils d'outils par rôle. JAMAIS Bash (le harnais lance les tests). Le garde-fou d'écriture
 # borne les Write/Edit aux zones autorisées quoi qu'il arrive.
+# Modèle par rôle (Alex, 22/08/2026) : le modèle était codé en dur (`sonnet` pour tous), ce qui
+# payait le même prix pour trier un fichier que pour arbitrer une architecture. On paie désormais
+# selon la difficulté réelle de la tâche.
+#
+# Le harnais ne CHOISIT pas : il applique une table. C'est la même logique que partout ailleurs
+# ici — une décision structurante reste une donnée lisible et modifiable, pas un jugement d'un LLM
+# au moment de l'exécution.
+_MODELE_DEFAUT = "sonnet"
+_MODELES = {
+    # Direction : arbitrage, stratégie, revue générale — ce qui engage tout le reste.
+    "chef": "fable",
+    "stratege": "claude-opus-5",
+    "auditeur": "claude-opus-5",
+    # Le développeur écrit le code que tout le monde relira ensuite : une erreur ici coûte des
+    # tours de correction à plusieurs autres agents.
+    "developpeur": "claude-opus-5",
+    "chef_dev": "claude-opus-5",
+    # Contrôle adversarial : trouver ce qui casse demande plus qu'exécuter.
+    "controleur": "claude-opus-5",
+    # Les autres restent sur le défaut (sonnet) : lecture, veille, mise en forme, surveillance.
+}
+
+
+def modele_pour(role: str) -> str:
+    """Modèle à utiliser pour un rôle. Défaut sûr si le rôle est inconnu."""
+    return _MODELES.get(role, _MODELE_DEFAUT)
+
+
 _OUTILS = {
     # la secrétaire est un agent CERVEAU (cerveau.py), pas un rôle de brigade : son prompt est
     # chargé comme les autres depuis son ROLE.md, mais elle ne code pas — lecture seule, sinon
@@ -606,7 +634,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=Tr
         "stream-json",
         "--verbose",
         "--model",
-        "sonnet",
+        modele_pour(role),
         "--permission-mode",
         "acceptEdits",
         "--allowedTools",
