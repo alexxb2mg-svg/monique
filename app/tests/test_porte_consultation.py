@@ -99,7 +99,7 @@ def test_une_question_consulte_puis_relance_le_demandeur(monkeypatch, tmp_path):
     )
     assert len(appels) == 3
     conseil, relance = appels[1]["cmd"], appels[2]["cmd"]
-    assert _opt(conseil, "--model") == beecham.modele_pour("conseil")
+    assert _opt(conseil, "--model") == "claude-fable-5"  # en dur : sinon tautologique
     assert _opt(conseil, "--allowedTools") == "Read,Glob,Grep"  # lecture seule
     assert _opt(conseil, "--append-system-prompt") == beecham.ROLES["stratege"]
     assert "--resume" not in conseil
@@ -109,6 +109,38 @@ def test_une_question_consulte_puis_relance_le_demandeur(monkeypatch, tmp_path):
     assert "Garde la colonne" in appels[2]["prompt"]
     assert res["ok"] and res["texte"] == _RAPPORT_OK
     assert _dossier_vide(tmp_path / "wt")
+
+
+def test_le_conseil_ne_degringole_pas_sur_le_modele_par_defaut(monkeypatch, tmp_path):
+    """Config d'Alex telle qu'elle existe : un « par_role » qui ne connaît pas « conseil »."""
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    monkeypatch.setattr(beecham, "_DERNIER_FICHIER", "\x00jamais lu")
+    (tmp_path / "atelier").mkdir()
+    (tmp_path / "atelier" / "modeles.json").write_text(
+        json.dumps({"defaut": "sonnet", "par_role": {"developpeur": "claude-opus-5"}}),
+        encoding="utf-8",
+    )
+    assert beecham.modele_pour("conseil") == "sonnet"  # le piège, documenté
+    assert beecham.modele_conseil() == "claude-fable-5"  # le conseil y échappe
+
+
+def test_la_porte_utilise_le_modele_du_conseil_meme_sans_cle_dans_le_fichier(
+    monkeypatch, tmp_path
+):
+    """Bout en bout : le même fichier réaliste, et le `--model` réellement passé au conseil."""
+    appels = _brancher(
+        monkeypatch,
+        tmp_path,
+        [("PROBLEMES : j'attends", _question, 0), ("réponse", None, 0), (_RAPPORT_OK, None, 0)],
+    )
+    monkeypatch.setattr(beecham, "_DERNIER_FICHIER", "\x00jamais lu")
+    (tmp_path / "atelier").mkdir(exist_ok=True)
+    (tmp_path / "atelier" / "modeles.json").write_text(
+        json.dumps({"defaut": "sonnet", "par_role": {"developpeur": "claude-opus-5"}}),
+        encoding="utf-8",
+    )
+    beecham._lancer_agent("developpeur", "consigne", tmp_path / "wt", modele="claude-opus-5")
+    assert _opt(appels[1]["cmd"], "--model") == "claude-fable-5"
 
 
 def test_une_seule_consultation_par_mission(monkeypatch, tmp_path):

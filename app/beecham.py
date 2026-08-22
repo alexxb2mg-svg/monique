@@ -479,6 +479,16 @@ def modele_pour(role: str) -> str:
     return cfg["par_role"].get(role, cfg["defaut"])
 
 
+def modele_conseil() -> str:
+    """Modèle du conseil (`_porte_consultation`). Ne passe PAS par `modele_pour` : le
+    `atelier/modeles.json` d'Alex existe déjà, son « par_role » REMPLACE la table du code et ne
+    connaît pas « conseil » — le conseil serait lancé sur le défaut général (sonnet), donc plus
+    faible que le demandeur, en silence. Secours explicite sur la table du code ; Alex garde la
+    main en ajoutant « conseil » à son fichier. Fable 5 est ici un œil DIFFÉRENT (modèle
+    d'arbitrage de la brigade), pas forcément « plus puissant » qu'Opus 5."""
+    return _config_modeles()["par_role"].get("conseil", _MODELES["conseil"])
+
+
 def modeles_offerts() -> dict:
     """Menu des modèles proposés sur l'accueil (valeur -> libellé), qui sert AUSSI de liste
     blanche au serveur : une seule source, elles ne peuvent pas diverger."""
@@ -843,7 +853,7 @@ def _porte_consultation(role, questions, texte, worktree, session_id, journal, m
             "directement et précisément à sa question, en français, sans détour : il reprendra "
             "son travail avec ta réponse.\n\nSA QUESTION :\n" + corps,
             worktree,
-            modele=modele_pour("conseil"),
+            modele=modele_conseil(),
             service=True,
         )
         journal += conseil.get("journal", [])
@@ -1244,6 +1254,10 @@ def _lancer_agent(
             )
         texte, journal = _porte_rapport(
             role, texte, worktree, session_id, journal, _relancer_rapport, modele
+        )
+    elif questions:
+        journal.append(
+            f"{role} · {len(questions)} question(s) écartée(s) : pas de consultation sur cette session"
         )
 
     # D-15 : le courrier lu ne revient pas au tour suivant, ni le fil réellement affiché. Les
