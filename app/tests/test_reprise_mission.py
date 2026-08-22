@@ -273,6 +273,101 @@ def test_la_reprise_prend_le_dernier_verdict_pas_les_precedents(tmp_path, monkey
     assert "PREMIER tour" not in consigne
 
 
+def test_la_cloture_remonte_toute_la_chaine_de_reprises(tmp_path, monkeypatch):
+    """mid1 -> mid2 -> mid3 : à la fusion de mid3, les DEUX ancêtres sont `repris` et leurs
+    branches ont disparu. En ne remontant que d'un niveau, mid1 restait `bloque` pour toujours,
+    avec sa branche sur le disque — et la chaîne de reprises est le régime normal du harnais
+    (mission 8 : trois passes)."""
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid1 = _bloquer(db)
+    b1 = beecham.lire_mission(mid1, db)["branche"]
+
+    mid2 = beecham.reprendre_mission(mid1, chemin=db)
+    beecham.executer_mission(  # la 1re reprise bloque à son tour
+        mid2,
+        chemin=db,
+        _agent=_dev_qui_ecrit("correction.py", "CORRIGE = 2\n"),
+        _controleur=lambda *a: {"verdict": "corriger", "raison": "encore un défaut"},
+        max_tours=1,
+    )
+    b2 = beecham.lire_mission(mid2, db)["branche"]
+
+    mid3 = beecham.reprendre_mission(mid2, chemin=db)
+    r = beecham.executer_mission(
+        mid3,
+        chemin=db,
+        _agent=_dev_qui_ecrit("correction2.py", "CORRIGE = 3\n"),
+        _controleur=lambda *a: {"verdict": "accepte", "raison": "ok"},
+    )
+
+    assert r["statut"] == "valide"
+    assert beecham.lire_mission(mid2, db)["statut"] == "repris"
+    assert beecham.lire_mission(mid1, db)["statut"] == "repris"  # le grand-parent AUSSI
+    for b in (b1, b2):
+        assert b not in _git(repo, "branch", "--list", b).stdout
+        assert not (beecham.WORKTREES / b.replace("/", "_")).exists()
+
+
+def test_une_chaine_circulaire_ne_fait_pas_boucler_la_cloture(tmp_path, monkeypatch):
+    """Filet de la remontée : deux missions qui se désignent l'une l'autre (base incohérent, base
+    qui pointe sur lui-même) doivent terminer, pas tourner à l'infini."""
+    _repo_, db = _monde(tmp_path, monkeypatch)
+    a = beecham.demarrer_mission("A", db)
+    b = beecham.demarrer_mission("B", db)
+    beecham._maj(a, db, statut="bloque", base=f"beecham/{b}")
+    beecham._maj(b, db, statut="bloque", base=f"beecham/{a}")
+
+    beecham._clore_origine(f"beecham/{a}", db)  # boucle infinie sans le garde-fou
+
+    assert beecham.lire_mission(a, db)["statut"] == "repris"
+    assert beecham.lire_mission(b, db)["statut"] == "repris"
+
+
+def _bloquer_avec_longue_consigne(db, avec_verdict):
+    """Mission bloquée dont la consigne porte un marqueur au DÉBUT et un autre à la FIN, séparés
+    par plus de 5 000 caractères de cadrage."""
+    consigne = (
+        "## Objectif\nMARQUEUR_TETE\n\n"
+        + "## Détails\nblabla de cadrage.\n" * 300
+        + "\n## Annexe\nMARQUEUR_FIN\n"
+    )
+    assert len(consigne) > 5000
+    mid = beecham.demarrer_mission(consigne, db)
+    beecham._maj(mid, db, statut="bloque")
+    if avec_verdict:
+        beecham.ecrire_verdict(mid, "developpeur", "corriger", "il manque le test")
+    return mid, consigne
+
+
+def test_avec_verdict_la_reprise_ne_recopie_pas_tout_le_cadrage(tmp_path, monkeypatch):
+    """Anti-patron d'Hermes (#11996) : recopier le cadrage d'origine dans la relance le fossilise.
+    Le travail est déjà dans la copie de l'agent et le verdict porte la correction — on ne garde
+    qu'un rappel en tête, assez pour que l'agent sache ce qu'on lui demandait."""
+    _repo_, db = _monde(tmp_path, monkeypatch)
+    mid, origine = _bloquer_avec_longue_consigne(db, avec_verdict=True)
+
+    consigne = beecham.lire_mission(beecham.reprendre_mission(mid, chemin=db), db)[
+        "consigne"
+    ]
+    assert "MARQUEUR_FIN" not in consigne  # le cadrage n'est PAS recopié en entier
+    assert "MARQUEUR_TETE" in consigne  # ...mais l'agent reste orienté
+    assert "il manque le test" in consigne
+    assert len(consigne) < len(origine)  # bien plus courte que l'ancienne
+
+
+def test_sans_verdict_la_consigne_d_origine_est_transmise_entiere(tmp_path, monkeypatch):
+    """Sans verdict, la consigne d'origine est le SEUL contexte disponible : la couper serait le
+    contraire du but."""
+    _repo_, db = _monde(tmp_path, monkeypatch)
+    mid, _origine = _bloquer_avec_longue_consigne(db, avec_verdict=False)
+
+    consigne = beecham.lire_mission(beecham.reprendre_mission(mid, chemin=db), db)[
+        "consigne"
+    ]
+    assert "MARQUEUR_TETE" in consigne
+    assert "MARQUEUR_FIN" in consigne
+
+
 def test_un_verdict_qui_contient_des_titres_markdown_nest_pas_tronque(
     tmp_path, monkeypatch
 ):

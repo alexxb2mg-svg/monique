@@ -1342,15 +1342,34 @@ def _dernier_verdict(mission_id) -> str:
     return ("## " + blocs[-1]).strip() if len(blocs) > 1 else txt.strip()
 
 
+# Borne du RAPPEL de la consigne d'origine dans une consigne de reprise (cf. `reprendre_mission`).
+# Quelques centaines de caractères : de quoi orienter l'agent, pas de quoi refossiliser le cadrage.
+BORNE_RAPPEL_CONSIGNE = 600
+
+
 def _clore_origine(base, chemin=None) -> None:
     """Une reprise fusionnée rend sa mission d'origine caduque : son travail est dans le tronc,
     sa branche et son worktree n'ont plus de raison de traîner sur le disque, et son statut doit
     dire qu'elle a été REPRISE plutôt que de rester `bloque` pour toujours (elle continuerait
-    sinon d'apparaître à Alex comme un blocage à traiter)."""
-    if not base or "/" not in base:
-        return
-    _nettoyer(base, WORKTREES / base.replace("/", "_"))
-    _maj(base.rsplit("/", 1)[-1], chemin, statut="repris")  # branche = beecham/<mission_id>
+    sinon d'apparaître à Alex comme un blocage à traiter).
+
+    TRANSITIF : la chaîne de reprises est le régime normal de ce harnais (mission 8 : trois passes,
+    mission 9 : deux). En ne remontant que d'un niveau, la fusion de mid3 laissait mid1 `bloque`
+    pour toujours, avec sa branche sur le disque — et une reprise tentée dessus repartait d'une
+    branche DÉJÀ fusionnée (diff vide -> `livre` incompréhensible). On remonte donc de `base` en
+    `base` jusqu'à la première mission de la chaîne, en lisant chaque mission AVANT de la marquer
+    (c'est elle qui porte le maillon suivant). `vus` borne la remontée : une chaîne circulaire ou
+    un `base` qui pointe sur lui-même ne doit pas faire tourner la fonction à l'infini."""
+    vus = set()
+    while base and "/" in base:
+        mid = base.rsplit("/", 1)[-1]  # branche = beecham/<mission_id>
+        if mid in vus:
+            return
+        vus.add(mid)
+        m = lire_mission(mid, chemin)
+        _nettoyer(base, WORKTREES / base.replace("/", "_"))
+        _maj(mid, chemin, statut="repris")
+        base = (m or {}).get("base")
 
 
 def reprendre_mission(mission_id, complement="", chemin=None) -> str | None:
@@ -1371,12 +1390,22 @@ def reprendre_mission(mission_id, complement="", chemin=None) -> str | None:
         f"REPRISE de la mission {mission_id}. Son travail est DÉJÀ dans ta copie (commits de la "
         "passe précédente) : corrige-le, ne repars pas de zéro.\n\n"
     )
+    # Avec un verdict, le cadrage d'origine est du poids mort : le travail est déjà dans la copie
+    # de l'agent et la correction est dans le verdict. Le recopier en entier est l'anti-patron
+    # d'Hermes (#11996) — les premiers tours fossilisent et sont réémis à chaque passe (mesuré :
+    # 10 824 caractères pour la 3e passe de la mission 8). On n'en garde qu'un RAPPEL en tête,
+    # pour que l'agent sache ce qu'on lui demandait. Sans verdict, en revanche, la consigne est le
+    # seul contexte disponible : la couper serait le contraire du but.
+    rappel, titre = m["consigne"], "CONSIGNE D'ORIGINE"
+    if verdict and len(rappel) > BORNE_RAPPEL_CONSIGNE:
+        rappel = _tronquer(rappel, BORNE_RAPPEL_CONSIGNE) + "\n[…]"
+        titre = "CE QU'ON TE DEMANDAIT (extrait)"
+    consigne += f"{titre} :\n{rappel}\n\n"
     if verdict:
         consigne += f"VERDICT QUI A BLOQUÉ LA MISSION :\n{verdict}\n\n"
     if complement:
         consigne += f"COMPLÉMENT :\n{complement}\n\n"
-    consigne += f"CONSIGNE D'ORIGINE :\n{m['consigne']}"
-    return demarrer_mission(consigne, chemin, base=m["branche"])
+    return demarrer_mission(consigne.rstrip() + "\n", chemin, base=m["branche"])
 
 
 def valider(mission_id, chemin=None) -> dict:
