@@ -73,7 +73,7 @@ def test_le_modele_est_bien_passe_a_la_commande(monkeypatch, tmp_path):
     monkeypatch.setattr(beecham.subprocess, "Popen", _FauxPopen)
     monkeypatch.setattr(beecham, "_ecrire_garde", lambda: tmp_path / "settings.json")
     monkeypatch.setattr(beecham, "_relever_canal", lambda role: ([], []))
-    monkeypatch.setattr(beecham, "_archiver_canal", lambda role, m: None)
+    monkeypatch.setattr(beecham, "_archiver_canal", lambda role, m, f=(): None)
     monkeypatch.setattr(beecham, "_collecter_canal", lambda role, wt: {"deposes": 0, "fil": 0, "rejetes": 0})
 
     def _modele_utilise(role, **kw):

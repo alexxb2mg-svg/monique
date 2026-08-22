@@ -11,12 +11,12 @@ import courrier
 
 
 def test_bloc_contexte_vide_si_rien_a_lire():
-    assert beecham._bloc_contexte_canal([], []) == ""
+    assert beecham._bloc_contexte_canal([], []) == ("", [])
 
 
 def test_bloc_contexte_cadre_les_messages_comme_des_donnees():
     messages = [{"expediteur": "chef", "sujet": "Revue", "corps": "Merci de relire le diff."}]
-    bloc = beecham._bloc_contexte_canal(messages, [])
+    bloc, _ = beecham._bloc_contexte_canal(messages, [])
     # le contenu est bien present...
     assert "Merci de relire le diff." in bloc
     assert "chef" in bloc
@@ -27,10 +27,11 @@ def test_bloc_contexte_cadre_les_messages_comme_des_donnees():
 
 def test_bloc_contexte_inclut_le_fil_de_coordination():
     fil = [{"auteur": "chercheur", "type": "alerte", "corps": "Dependance obsolete detectee"}]
-    bloc = beecham._bloc_contexte_canal([], fil)
+    bloc, affiche = beecham._bloc_contexte_canal([], fil)
     assert "Dependance obsolete detectee" in bloc
     assert "chercheur" in bloc
     assert "FIL DE COORDINATION" in bloc
+    assert affiche == fil  # rien d'ecarte : tout tient dans la borne
 
 
 def test_relever_canal_est_fail_soft_si_bases_absentes(monkeypatch, tmp_path):
@@ -190,7 +191,9 @@ def test_collecter_canal_est_fail_soft(monkeypatch, tmp_path):
     }
 
 
-def test_fil_partage_nest_lu_quune_fois_par_agent(monkeypatch, tmp_path):
+def test_fil_partage_nest_consomme_qu_a_l_archivage(monkeypatch, tmp_path):
+    """Relever ne consomme pas : c'est `_archiver_canal`, en fin de session, qui retire l'entree
+    du flux de CET agent — et d'aucun autre."""
     db_f = tmp_path / "coordination.sqlite"
     coordination.poster_fil(str(db_f), "chef", "Decision : on part sur SQLite")
     monkeypatch.setattr(beecham, "DB_COURRIER", tmp_path / "absente.sqlite")
@@ -198,8 +201,98 @@ def test_fil_partage_nest_lu_quune_fois_par_agent(monkeypatch, tmp_path):
 
     _, fil_premier_tour = beecham._relever_canal("developpeur")
     assert len(fil_premier_tour) == 1
-    _, fil_second_tour = beecham._relever_canal("developpeur")
-    assert fil_second_tour == []
+    # relever une seconde fois ne brule rien (lecture pure)
+    assert len(beecham._relever_canal("developpeur")[1]) == 1
+
+    beecham._archiver_canal("developpeur", [], fil_premier_tour)
+    assert beecham._relever_canal("developpeur")[1] == []
     # ... mais un AUTRE agent le voit toujours
     _, fil_autre_agent = beecham._relever_canal("auditeur")
     assert len(fil_autre_agent) == 1
+
+
+def test_seules_les_entrees_affichees_sont_marquees_lues(monkeypatch, tmp_path):
+    """La borne ECARTE, elle ne BRULE pas : ce qui n'a pas ete montre doit revenir au tour
+    suivant. Sinon la troncature recree la consommation silencieuse qu'on vient de retirer de la
+    lecture."""
+    db_f = tmp_path / "coordination.sqlite"
+    for i in range(40):
+        coordination.poster_fil(str(db_f), "chef", f"MSG-{i} " + "detail. " * 20)
+    monkeypatch.setattr(beecham, "DB_COURRIER", tmp_path / "absente.sqlite")
+    monkeypatch.setattr(beecham, "DB_COORDINATION", db_f)
+
+    _, fil = beecham._relever_canal("developpeur")
+    bloc, fil_affiche = beecham._bloc_contexte_canal([], fil)
+    beecham._archiver_canal("developpeur", [], fil_affiche)
+
+    restants = beecham._relever_canal("developpeur")[1]
+    assert 0 < len(fil_affiche) < 40  # la borne a bien ecarte
+    assert len(restants) == 40 - len(fil_affiche)
+    assert "MSG-0 " in restants[0]["corps"]  # le plus ancien n'est pas perdu
+    # espace final volontaire : sans lui, "MSG-2" matcherait "MSG-24" et l'assertion serait fausse
+    assert all(f"MSG-{i} " not in bloc for i in range(len(restants)))
+
+
+def test_bloc_fil_borne_et_annonce_ce_qu_il_ecarte():
+    fil = [{"auteur": "chef", "corps": f"MSG-{i} " + "x" * 200} for i in range(40)]
+    bloc, affiche = beecham._bloc_fil(fil, beecham.BORNE_CANAL)
+
+    assert len(bloc) <= beecham.BORNE_CANAL
+    assert 0 < len(affiche) < 40
+    assert "ecartee" in bloc or "écartée" in bloc  # l'agent SAIT qu'il ne voit pas tout
+    assert affiche[-1] is fil[-1]  # ce sont les PLUS RECENTES qui sont gardees
+
+
+def test_le_courrier_personnel_nest_jamais_rogne():
+    """Le fil absorbe la borne, pas le courrier : un message adresse nommement au persona passe
+    entier, meme si un fil enorme l'accompagne."""
+    messages = [{"expediteur": "chef", "sujet": "Revue", "corps": "PAVE. " * 900}]
+    fil = [{"auteur": "chercheur", "corps": f"MSG-{i} " + "x" * 200} for i in range(40)]
+
+    bloc, _ = beecham._bloc_contexte_canal(messages, fil)
+    assert messages[0]["corps"] in bloc
+
+
+def test_le_prompt_envoye_porte_un_fil_borne(tmp_path, monkeypatch):
+    """Filet du bout en bout, sur le prompt REELLEMENT ecrit sur stdin : le fil injecte est borne,
+    et ce que la borne a ecarte reste non lu pour le tour suivant."""
+    db_f = tmp_path / "coordination.sqlite"
+    for i in range(40):
+        coordination.poster_fil(str(db_f), "chef", f"MSG-{i} " + "detail. " * 20)
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier_absent")
+    monkeypatch.setattr(beecham, "DB_COURRIER", tmp_path / "absente.sqlite")
+    monkeypatch.setattr(beecham, "DB_COORDINATION", db_f)
+    monkeypatch.setattr(beecham, "_ecrire_garde", lambda: tmp_path / "settings.json")
+
+    import superviseur
+
+    monkeypatch.setattr(superviseur, "enregistrer", lambda *a, **k: None)
+    monkeypatch.setattr(superviseur, "finir", lambda *a, **k: None)
+
+    envoyes = []
+
+    def faux_popen(cmd, **kwargs):
+        class FauxProc:
+            pid = 424242
+            returncode = 0
+
+            def communicate(self, input=None, timeout=None):
+                if cmd[0] == "claude":  # le superviseur peut lancer d'autres Popen
+                    envoyes.append(input or "")
+                return ("", "")
+
+            def kill(self):
+                pass
+
+        return FauxProc()
+
+    monkeypatch.setattr(beecham.subprocess, "Popen", faux_popen)
+
+    beecham._lancer_agent("developpeur", "CONSIGNE-DU-JOUR", tmp_path)
+
+    assert len(envoyes) == 1
+    prompt = envoyes[0]
+    assert "MSG-39 " in prompt  # les plus recentes sont la...
+    assert "MSG-0 " not in prompt  # ...les plus anciennes ecartees...
+    restants = beecham._relever_canal("developpeur")[1]
+    assert "MSG-0 " in restants[0]["corps"]  # ...mais PAS brulees

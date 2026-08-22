@@ -4,6 +4,7 @@ import pytest
 from coordination import (
     poster_fil,
     lire_fil_non_lu,
+    marquer_lu,
     lister_fil,
     epingler_fil,
     archiver_fil,
@@ -41,23 +42,35 @@ def test_cas_nominal_poster_et_lister(db_path):
     assert mode.lower() == "wal"
 
 
-def test_lire_fil_non_lu_et_idempotence(db_path):
-    """Vérifie que l'agent ne reçoit les messages qu'une seule fois et met à jour lu_par."""
+def test_lire_ne_consomme_pas_seul_marquer_lu_consomme(db_path):
+    """La lecture est PURE : relire ne brûle rien. C'est `marquer_lu` — et lui seul — qui retire
+    une entrée du flux d'un agent, ce qui permet de ne consommer que ce qui a été montré."""
     poster_fil(db_path, "Agent_A", "Note 1")
     poster_fil(db_path, "Agent_A", "Note 2")
 
-    # Première lecture par Agent_B
     non_lus_b1 = lire_fil_non_lu(db_path, "Agent_B", limite=50)
     assert len(non_lus_b1) == 2
-    assert "Agent_B" in json.loads(non_lus_b1[0]["lu_par"])
+    assert json.loads(non_lus_b1[0]["lu_par"]) == []  # rien n'a été écrit
 
-    # Seconde lecture par Agent_B : aucun nouveau message
-    non_lus_b2 = lire_fil_non_lu(db_path, "Agent_B")
-    assert len(non_lus_b2) == 0
+    # relire ne consomme pas
+    assert len(lire_fil_non_lu(db_path, "Agent_B")) == 2
 
-    # Lecture par Agent_C : reçoit les messages
-    non_lus_c = lire_fil_non_lu(db_path, "Agent_C")
-    assert len(non_lus_c) == 2
+    # consommer une SEULE entrée : l'autre reste au flux
+    marquer_lu(db_path, "Agent_B", [non_lus_b1[0]["id"]])
+    restants = lire_fil_non_lu(db_path, "Agent_B")
+    assert [e["corps"] for e in restants] == ["Note 2"]
+
+    # ... et un autre agent voit toujours tout
+    assert len(lire_fil_non_lu(db_path, "Agent_C")) == 2
+
+
+def test_marquer_lu_est_idempotent_et_ignore_les_ids_inconnus(db_path):
+    id_1 = poster_fil(db_path, "Agent_A", "Note 1")
+
+    marquer_lu(db_path, "Agent_B", [id_1])
+    marquer_lu(db_path, "Agent_B", [id_1, 999])  # 2e passage + id inexistant : sans effet ni erreur
+
+    assert json.loads(lister_fil(db_path)[0]["lu_par"]) == ["Agent_B"]
 
 
 def test_epingler_et_archiver_fil(db_path):
@@ -95,7 +108,8 @@ def test_limite_et_ordre_chronologique(db_path):
     assert non_lus_limite[0]["corps"] == "Message 0"
     assert non_lus_limite[2]["corps"] == "Message 2"
 
-    # Les 2 restants au second passage
+    # Les 2 restants une fois les 3 premiers consommés
+    marquer_lu(db_path, "Agent_X", [e["id"] for e in non_lus_limite])
     non_lus_reste = lire_fil_non_lu(db_path, "Agent_X", limite=3)
     assert len(non_lus_reste) == 2
     assert non_lus_reste[0]["corps"] == "Message 3"
@@ -122,10 +136,10 @@ def test_lister_fil_statut_archive(db_path):
 
 def test_cumul_lu_par_plusieurs_agents(db_path):
     """Vérifie que plusieurs agents lisant la même entrée apparaissent tous dans lu_par."""
-    poster_fil(db_path, "Agent_A", "Message partagé")
+    id_1 = poster_fil(db_path, "Agent_A", "Message partagé")
 
-    lire_fil_non_lu(db_path, "Agent_X")
-    lire_fil_non_lu(db_path, "Agent_Y")
+    marquer_lu(db_path, "Agent_X", [id_1])
+    marquer_lu(db_path, "Agent_Y", [id_1])
 
     entrees = lister_fil(db_path)
     lu_par_liste = json.loads(entrees[0]["lu_par"])
