@@ -49,6 +49,17 @@ def _dev_qui_ecrit(nom, contenu):
     return dev
 
 
+def _bloquer_a_la_main(repo, db, consigne):
+    """Mission `bloque` posée sans lancer d'agent, mais avec une branche qui porte UN commit
+    au-delà du tronc — comme le fait le blocage réel depuis la mission 9. Sans ce commit,
+    `reprendre_mission` refuse (mission 15) et il n'y a plus de consigne à observer."""
+    mid = beecham.demarrer_mission(consigne, db)
+    beecham._maj(mid, db, statut="bloque")
+    c = _git(repo, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "passe 1").stdout
+    _git(repo, "update-ref", f"refs/heads/beecham/{mid}", c.strip())
+    return mid
+
+
 def _bloquer(db, raison="il manque le test de non-régression"):
     """Mène une mission jusqu'au statut `bloque` (max_tours=1 + verdict « corriger »)."""
     mid = beecham.demarrer_mission("consigne d'origine", db)
@@ -247,9 +258,8 @@ def test_reprendre_une_mission_non_bloquee_est_refuse(tmp_path, monkeypatch):
 
 def test_verdict_absent_ne_fait_pas_echouer_la_reprise(tmp_path, monkeypatch):
     """Fail-soft : sans fichier de verdict on reprend quand même, avec le seul complément fourni."""
-    _repo_, db = _monde(tmp_path, monkeypatch)
-    mid = beecham.demarrer_mission("consigne d'origine", db)
-    beecham._maj(mid, db, statut="bloque")  # bloquée sans verdict sur disque
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid = _bloquer_a_la_main(repo, db, "consigne d'origine")  # sans verdict sur disque
 
     mid2 = beecham.reprendre_mission(mid, "ajoute le test manquant", chemin=db)
     assert mid2
@@ -261,9 +271,8 @@ def test_verdict_absent_ne_fait_pas_echouer_la_reprise(tmp_path, monkeypatch):
 def test_la_reprise_prend_le_dernier_verdict_pas_les_precedents(tmp_path, monkeypatch):
     """Le fichier de verdicts est append-only : c'est le DERNIER bloc (celui qui a bloqué) qui
     sert de consigne de correction, pas un tour antérieur déjà traité."""
-    _repo_, db = _monde(tmp_path, monkeypatch)
-    mid = beecham.demarrer_mission("consigne d'origine", db)
-    beecham._maj(mid, db, statut="bloque")
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid = _bloquer_a_la_main(repo, db, "consigne d'origine")
     beecham.ecrire_verdict(mid, "developpeur", "corriger", "PREMIER tour, déjà traité")
     beecham.ecrire_verdict(mid, "developpeur", "corriger", "DERNIER tour, celui qui bloque")
 
@@ -323,7 +332,7 @@ def test_une_chaine_circulaire_ne_fait_pas_boucler_la_cloture(tmp_path, monkeypa
     assert beecham.lire_mission(b, db)["statut"] == "repris"
 
 
-def _bloquer_avec_longue_consigne(db, avec_verdict):
+def _bloquer_avec_longue_consigne(repo, db, avec_verdict):
     """Mission bloquée dont la consigne porte un marqueur au DÉBUT et un autre à la FIN, séparés
     par plus de 5 000 caractères de cadrage."""
     consigne = (
@@ -332,8 +341,7 @@ def _bloquer_avec_longue_consigne(db, avec_verdict):
         + "\n## Annexe\nMARQUEUR_FIN\n"
     )
     assert len(consigne) > 5000
-    mid = beecham.demarrer_mission(consigne, db)
-    beecham._maj(mid, db, statut="bloque")
+    mid = _bloquer_a_la_main(repo, db, consigne)
     if avec_verdict:
         beecham.ecrire_verdict(mid, "developpeur", "corriger", "il manque le test")
     return mid, consigne
@@ -343,8 +351,8 @@ def test_avec_verdict_la_reprise_ne_recopie_pas_tout_le_cadrage(tmp_path, monkey
     """Anti-patron d'Hermes (#11996) : recopier le cadrage d'origine dans la relance le fossilise.
     Le travail est déjà dans la copie de l'agent et le verdict porte la correction — on ne garde
     qu'un rappel en tête, assez pour que l'agent sache ce qu'on lui demandait."""
-    _repo_, db = _monde(tmp_path, monkeypatch)
-    mid, origine = _bloquer_avec_longue_consigne(db, avec_verdict=True)
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid, origine = _bloquer_avec_longue_consigne(repo, db, avec_verdict=True)
 
     consigne = beecham.lire_mission(beecham.reprendre_mission(mid, chemin=db), db)[
         "consigne"
@@ -358,8 +366,8 @@ def test_avec_verdict_la_reprise_ne_recopie_pas_tout_le_cadrage(tmp_path, monkey
 def test_sans_verdict_la_consigne_d_origine_est_transmise_entiere(tmp_path, monkeypatch):
     """Sans verdict, la consigne d'origine est le SEUL contexte disponible : la couper serait le
     contraire du but."""
-    _repo_, db = _monde(tmp_path, monkeypatch)
-    mid, _origine = _bloquer_avec_longue_consigne(db, avec_verdict=False)
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid, _origine = _bloquer_avec_longue_consigne(repo, db, avec_verdict=False)
 
     consigne = beecham.lire_mission(beecham.reprendre_mission(mid, chemin=db), db)[
         "consigne"
@@ -368,15 +376,89 @@ def test_sans_verdict_la_consigne_d_origine_est_transmise_entiere(tmp_path, monk
     assert "MARQUEUR_FIN" in consigne
 
 
+def _journal(tmp_path):
+    return (tmp_path / "atelier" / "journal.md").read_text(encoding="utf-8")
+
+
+def test_une_base_sans_commit_est_refusee_sans_rien_creer(tmp_path, monkeypatch):
+    """Reproduction EXACTE de l'incident du 22/08 22h32 : la branche de la mission bloquée existe
+    mais ne porte aucun commit au-delà du tronc (avant la mission 9, le blocage ne commitait pas).
+    La consigne jurait « ton travail est DÉJÀ dans ta copie » à un agent devant une copie vide —
+    il a reconstruit de mémoire. Ici : refus, aucun worktree, aucune mission en base, raison
+    nommant la branche. Retire le contrôle dans `reprendre_mission` : ce test tombe."""
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid = beecham.demarrer_mission("consigne d'origine", db)
+    beecham._maj(mid, db, statut="bloque")
+    branche = beecham.lire_mission(mid, db)["branche"]
+    _git(repo, "branch", branche, "main")  # branche posée sur le tronc, sans travail
+    avant = len(beecham.lister_missions(db))
+
+    assert beecham.reprendre_mission(mid, chemin=db) is None
+    assert len(beecham.lister_missions(db)) == avant
+    assert not (beecham.WORKTREES / branche.replace("/", "_")).exists()
+    assert not beecham.WORKTREES.exists()
+    j = _journal(tmp_path)
+    assert branche in j and "0 trouvé" in j and "reprise refusée" in j
+
+
+def test_la_consigne_chiffre_le_travail_quand_il_est_la(tmp_path, monkeypatch):
+    """Le harnais n'affirme jamais ce qu'il n'a pas vérifié : avec des commits sur la branche,
+    la consigne le dit ET le chiffre (commits, fichiers) — vérifiable par l'agent."""
+    _repo_, db = _monde(tmp_path, monkeypatch)
+    mid = _bloquer(db)  # 1 commit (travail.py) figé au blocage
+    consigne = beecham.lire_mission(beecham.reprendre_mission(mid, chemin=db), db)[
+        "consigne"
+    ]
+    assert "DÉJÀ dans ta copie" in consigne
+    assert "1 commit(s)" in consigne
+    assert "app/travail.py" in consigne
+
+
+def test_une_branche_absente_du_depot_est_refusee(tmp_path, monkeypatch):
+    """Même règle que la base vide : pas de travail, pas de reprise. Laisser passer créerait
+    une mission fantôme vouée à `echec` dès `_creer_worktree`, avec une consigne que personne
+    ne lirait."""
+    _repo_, db = _monde(tmp_path, monkeypatch)
+    mid = beecham.demarrer_mission("sans branche", db)
+    beecham._maj(mid, db, statut="bloque")
+    avant = len(beecham.lister_missions(db))
+
+    assert beecham.reprendre_mission(mid, chemin=db) is None
+    assert len(beecham.lister_missions(db)) == avant
+    j = _journal(tmp_path)
+    assert f"beecham/{mid}" in j and "absente du dépôt" in j and "reprise refusée" in j
+
+
+def test_une_base_en_retard_sur_le_tronc_est_signalee_pas_refusee(tmp_path, monkeypatch):
+    """Deux fusions ont fait avancer le tronc depuis le blocage : l'écart figure au journal et
+    dans la consigne (l'agent sait qu'il travaille sur une base ancienne), la reprise passe."""
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid = _bloquer(db)
+    _fusionner_autre_mission(repo, "A = 1\n")
+    _fusionner_autre_mission(repo, "A = 2\n")
+
+    mid2 = beecham.reprendre_mission(mid, chemin=db)
+    assert mid2
+    consigne = beecham.lire_mission(mid2, db)["consigne"]
+    assert "retard de 2 commit(s)" in consigne
+    assert "retard de 2 commit(s)" in _journal(tmp_path)
+
+    # base à jour : pas d'avertissement parasite
+    mid_b = _bloquer(db)
+    consigne = beecham.lire_mission(beecham.reprendre_mission(mid_b, chemin=db), db)[
+        "consigne"
+    ]
+    assert "retard" not in consigne
+
+
 def test_un_verdict_qui_contient_des_titres_markdown_nest_pas_tronque(
     tmp_path, monkeypatch
 ):
     """La raison d'un verdict est du markdown de contrôleur, avec ses propres `## `. Découper sur
     le dernier `## ` venu perdrait la TÊTE du dernier bloc — c'est-à-dire le début de la consigne
     de correction, la valeur même que la reprise existe pour récupérer. L'ancre est la date ISO."""
-    _repo_, db = _monde(tmp_path, monkeypatch)
-    mid = beecham.demarrer_mission("consigne d'origine", db)
-    beecham._maj(mid, db, statut="bloque")
+    repo, db = _monde(tmp_path, monkeypatch)
+    mid = _bloquer_a_la_main(repo, db, "consigne d'origine")
     beecham.ecrire_verdict(mid, "developpeur", "corriger", "PREMIER tour, déjà traité")
     beecham.ecrire_verdict(
         mid,

@@ -1516,6 +1516,23 @@ def _clore_origine(base, chemin=None) -> None:
         base = (m or {}).get("base")
 
 
+def _etat_base(branche) -> dict:
+    """Ce que porte RÉELLEMENT la branche d'une mission bloquée, mesuré sur le dépôt — jamais
+    supposé. `existe` : la branche est sur le disque ; `commits` : travail au-delà du tronc ;
+    `fichiers` : fichiers touchés par ce travail ; `retard` : commits du tronc survenus depuis."""
+    r = _git(RACINE, "rev-list", "--count", f"{BRANCHE_TRONC}..{branche}")
+    if r.returncode != 0:
+        return {"existe": False, "commits": 0, "fichiers": [], "retard": 0}
+    retard = _git(RACINE, "rev-list", "--count", f"{branche}..{BRANCHE_TRONC}")
+    fichiers = _git(RACINE, "diff", "--name-only", f"{BRANCHE_TRONC}...{branche}")
+    return {
+        "existe": True,
+        "commits": int(r.stdout.strip() or 0),
+        "fichiers": fichiers.stdout.splitlines(),
+        "retard": int(retard.stdout.strip() or 0),
+    }
+
+
 def reprendre_mission(mission_id, complement="", chemin=None) -> str | None:
     """Crée une mission NEUVE qui repart de la branche d'une mission `bloque`, avec le verdict qui
     l'a bloquée en tête de consigne. Renvoie son id, ou None si la mission n'est pas reprenable.
@@ -1525,15 +1542,53 @@ def reprendre_mission(mission_id, complement="", chemin=None) -> str | None:
     22/08 : quatre passes, 23,66 USD, rien de fusionné, alors que chaque verdict pointait une
     correction de dix lignes. Ici on repart du travail existant et de la correction déjà écrite.
 
+    RÈGLE (incident du 22/08 22h32) : le harnais n'affirme JAMAIS à l'agent un fait qu'il n'a pas
+    vérifié. La consigne jurait « ton travail est DÉJÀ dans ta copie » sur une branche qui ne
+    portait AUCUN commit (avant la mission 9, le blocage ne commitait pas) : l'agent a reconstruit
+    de mémoire — troisième reconstruction de la même fonctionnalité. D'où :
+    - branche SANS commit au-delà du tronc -> REFUS (rien créé, rien lancé), raison dans
+      journal.md avec le chemin de l'ancien worktree s'il est encore là (le travail y est
+      peut-être en fichiers non commités — reliquat d'avant la mission 9, à traiter à la main) ;
+    - branche absente du disque -> REFUS, même règle : pas de travail, pas de reprise (sinon une
+      mission fantôme vouée à `echec` dès `_creer_worktree`, consigne que personne ne lira) ;
+    - branche AVEC commits -> la consigne l'affirme ET le chiffre (commits, fichiers) ;
+    - base en retard sur le tronc -> avertissement (journal + consigne), jamais un refus.
+
     Appel EXPLICITE : rien ne reprend automatiquement."""
     m = lire_mission(mission_id, chemin)
     if not m or m.get("statut") != "bloque":
         return None
+    branche = m["branche"]
+    etat = _etat_base(branche)
+    if etat["commits"] == 0:
+        wt = WORKTREES / branche.replace("/", "_")
+        if not etat["existe"]:
+            ou = "la branche est absente du dépôt — rien à reprendre"
+        elif wt.exists():
+            ou = f"le travail est peut-être encore en fichiers non commités dans {wt}"
+        else:
+            ou = f"l'ancien worktree {wt} n'existe plus"
+        raison = (
+            f"reprise de {mission_id} refusée : la branche {branche} ne porte aucun commit "
+            f"au-delà de {BRANCHE_TRONC} (0 trouvé) — {ou}"
+        )
+        LOG.warning("beecham: %s", raison)
+        journal_ajouter("harnais", raison, "reprise refusée")
+        return None
     verdict = _dernier_verdict(mission_id)
     consigne = (
-        f"REPRISE de la mission {mission_id}. Son travail est DÉJÀ dans ta copie (commits de la "
-        "passe précédente) : corrige-le, ne repars pas de zéro.\n\n"
+        f"REPRISE de la mission {mission_id}. Son travail est DÉJÀ dans ta copie : "
+        f"{etat['commits']} commit(s) de la passe précédente au-delà de {BRANCHE_TRONC}, "
+        f"touchant {', '.join(etat['fichiers']) or 'aucun fichier'}. Corrige-le, ne repars "
+        "pas de zéro.\n\n"
     )
+    if etat["retard"]:
+        avert = (
+            f"base {branche} en retard de {etat['retard']} commit(s) sur {BRANCHE_TRONC} "
+            "(fusions survenues depuis le blocage) — attends-toi à des conflits"
+        )
+        journal_ajouter("harnais", f"reprise de {mission_id} : {avert}", "avertissement")
+        consigne += f"ATTENTION : {avert}.\n\n"
     # Avec un verdict, le cadrage d'origine est du poids mort : le travail est déjà dans la copie
     # de l'agent et la correction est dans le verdict. Le recopier en entier est l'anti-patron
     # d'Hermes (#11996) — les premiers tours fossilisent et sont réémis à chaque passe (mesuré :
