@@ -39,7 +39,7 @@ def test_intention_lance_une_mission_chef(monkeypatch):
     monkeypatch.setattr(beecham, "demarrer_mission", lambda consigne: lances.append(consigne) or 1)
 
     class _FauxThread:
-        def __init__(self, target=None, args=(), daemon=None):
+        def __init__(self, target=None, args=(), kwargs=None, daemon=None):
             self.args = args
             lances.append(("role", args[1] if len(args) > 1 else None))
 
@@ -52,6 +52,47 @@ def test_intention_lance_une_mission_chef(monkeypatch):
     assert r.status_code == 200
     assert "il faudrait pouvoir filtrer les devis" in lances
     assert ("role", "chef") in lances
+
+
+# --- choix du modèle sur l'accueil (demande Alex 22/08) -----------------------------------------
+
+
+def _modele_transmis(monkeypatch, poste):
+    """Poste le formulaire et renvoie le `modele` réellement passé à `executer_mission`."""
+    vus = []
+    monkeypatch.setattr(beecham, "deposer_demande", lambda t: None)
+    monkeypatch.setattr(beecham, "demarrer_mission", lambda c: 1)
+
+    class _FauxThread:
+        def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+            vus.append((kwargs or {}).get("modele"))
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(serveur.threading, "Thread", _FauxThread)
+    r = client.post("/intention", data={"intention": "une demande", **poste})
+    assert r.status_code == 200
+    return vus
+
+
+def test_le_modele_choisi_par_alex_part_avec_la_mission(monkeypatch):
+    assert _modele_transmis(monkeypatch, {"modele": "claude-opus-5"}) == ["claude-opus-5"]
+
+
+def test_un_modele_hors_liste_blanche_est_ignore(monkeypatch):
+    """La valeur finit en argument de `claude --model` : jamais confiance au formulaire."""
+    for poste in ({"modele": "gpt-du-voisin"}, {"modele": "--dangerously-skip-permissions"}, {}):
+        assert _modele_transmis(monkeypatch, poste) == [None], poste
+
+
+def test_l_accueil_offre_les_modeles_avec_fable_par_defaut():
+    page = client.get("/").text
+    assert 'name="modele"' in page
+    for valeur, libelle in beecham.MODELES_OFFERTS.items():
+        assert valeur in page and libelle in page
+    # première option = celle qu'un navigateur présélectionne
+    assert page.index("claude-fable-5") < page.index("claude-opus-5")
 
 
 def test_intention_vide_ne_lance_rien(monkeypatch):

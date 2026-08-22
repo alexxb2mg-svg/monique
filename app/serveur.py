@@ -52,6 +52,8 @@ def _en_retard(echeance: str | None) -> bool:
 
 
 tpl.env.globals["en_retard"] = _en_retard
+# Menu « modèle » de l'accueil : même dictionnaire que la liste blanche de /intention.
+tpl.env.globals["modeles_offerts"] = beecham.MODELES_OFFERTS
 
 
 def _reconciliation_periodique(intervalle=900):
@@ -594,7 +596,7 @@ def rejeter_mission_beecham(request: Request, mid: str):
 
 
 @app.post("/intention", response_class=HTMLResponse)
-def intention(request: Request, intention: str = Form(...)):
+def intention(request: Request, intention: str = Form(...), modele: str = Form("")):
     """Point d'entrée unique : Alex dit ce qu'il faudrait faire, Monique décide qui s'en occupe.
 
     L'intention part au rôle `chef` — l'orchestrateur — et non à un persona choisi à la main.
@@ -612,8 +614,14 @@ def intention(request: Request, intention: str = Form(...)):
     # part tout de suite pour y réfléchir sans attendre la prochaine vague.
     beecham.deposer_demande(texte)
     mid = beecham.demarrer_mission(texte)
+    # LISTE BLANCHE : le formulaire n'est jamais cru sur parole — cette valeur finit en argument
+    # de `claude --model`. Hors liste (ou vide) => le modèle du rôle, jamais ce qui a été posté.
+    choisi = modele if modele in beecham.MODELES_OFFERTS else None
     threading.Thread(
-        target=beecham.executer_mission, args=(mid, "chef"), daemon=True
+        target=beecham.executer_mission,
+        args=(mid, "chef"),
+        kwargs={"modele": choisi},
+        daemon=True,
     ).start()
     return tpl.TemplateResponse(request, "vue_beecham.html", _beecham_ctx())
 

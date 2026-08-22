@@ -265,10 +265,15 @@ button.cb:active{transform:translateY(0)}
 }
 
 /* Dire à Monique — point d'entrée unique de l'accueil (D-15 / vision produit) */
-.dire{display:flex;gap:10px;align-items:flex-end;margin:14px 0 2px;max-width:56ch}
-.dire textarea{flex:1;font:inherit;font-size:15px;line-height:1.45;color:var(--encre);
+/* grille : la saisie occupe TOUTE la largeur (ligne 1), le menu modèle et le bouton passent
+   dessous (ligne 2) — un select à côté du textarea écraserait la zone d'écriture. */
+.dire{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin:14px 0 2px;
+  max-width:56ch}
+.dire textarea{grid-column:1 / -1;font:inherit;font-size:15px;line-height:1.45;color:var(--encre);
   background:var(--papier);border:1px solid var(--regle);border-radius:10px;padding:11px 13px;
   resize:vertical;min-height:52px}
+.dire select{font:inherit;font-size:14px;color:var(--encre);background:var(--papier);
+  border:1px solid var(--regle);border-radius:10px;padding:10px 12px;cursor:pointer;min-width:0}
 .dire textarea:focus{outline:none;border-color:var(--secu);box-shadow:0 0 0 3px var(--secudoux)}
 .dire button{font:inherit;font-weight:700;font-size:14px;color:#fff;background:var(--encre);
   border:0;border-radius:10px;padding:13px 20px;cursor:pointer;white-space:nowrap}

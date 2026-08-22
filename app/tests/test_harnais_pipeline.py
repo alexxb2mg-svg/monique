@@ -16,7 +16,7 @@ def _ctx(outils, consigne="fais X"):
 
 
 def _agent(session_id="SID-1"):
-    def agent(role, consigne, worktree, reprendre=None):
+    def agent(role, consigne, worktree, reprendre=None, modele=None):
         return {"journal": [f"{role} · code"], "texte": "fait", "session_id": session_id}
 
     return agent
@@ -39,7 +39,7 @@ def test_corriger_puis_reprise_puis_accepte():
     fusion. Le code doit tourner DEUX fois, et le statut final valide."""
     tours = {"code": 0, "revue": 0}
 
-    def agent(role, consigne, worktree, reprendre=None):
+    def agent(role, consigne, worktree, reprendre=None, modele=None):
         tours["code"] += 1
         return {"journal": [], "session_id": "SID-1"}
 
@@ -99,7 +99,7 @@ def test_diff_vide_est_livre():
 def test_corriger_sans_session_ne_boucle_pas():
     """Si l'agent n'a pas renvoyé de session_id, « corriger » ne peut pas reprendre -> rejet
     propre (pas de saut sans session)."""
-    def agent(role, consigne, worktree, reprendre=None):
+    def agent(role, consigne, worktree, reprendre=None, modele=None):
         return {"journal": []}  # pas de session_id
 
     outils = {

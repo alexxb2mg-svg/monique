@@ -72,7 +72,7 @@ def test_porte_relance_sur_rapport_non_conforme(monkeypatch):
     """L'agent est renvoyé à SA session (--resume) avec le motif exact, sans refaire le travail."""
     appels = []
 
-    def faux_lancer(role, consigne, worktree, reprendre=None, _relancer_rapport=True):
+    def faux_lancer(role, consigne, worktree, reprendre=None, _relancer_rapport=True, modele=None):
         appels.append({"consigne": consigne, "reprendre": reprendre, "relancer": _relancer_rapport})
         return {"ok": True, "journal": ["relance"], "texte": _RAPPORT_OK, "session_id": reprendre}
 
@@ -94,7 +94,7 @@ def test_porte_ne_jette_pas_la_mission_si_la_relance_echoue(monkeypatch):
     """Un rapport mal formé ne doit pas faire perdre un travail qui peut être bon : la porte
     signale, elle ne détruit pas."""
 
-    def faux_lancer(role, consigne, worktree, reprendre=None, _relancer_rapport=True):
+    def faux_lancer(role, consigne, worktree, reprendre=None, _relancer_rapport=True, modele=None):
         return {"ok": True, "journal": [], "texte": "toujours pas conforme", "session_id": reprendre}
 
     monkeypatch.setattr(beecham, "_lancer_agent", faux_lancer)

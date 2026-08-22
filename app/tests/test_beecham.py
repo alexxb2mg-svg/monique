@@ -32,7 +32,7 @@ def _repo(tmp_path):
 
 
 def _agent_ecrit(nom, contenu="VALEUR = 42\n"):
-    def faux_agent(role, consigne, worktree, reprendre=None):
+    def faux_agent(role, consigne, worktree, reprendre=None, modele=None):
         (Path(worktree) / "app" / nom).write_text(contenu, encoding="utf-8")
         return {"ok": True, "journal": [f"{role} · Write {nom}"], "texte": "fait"}
 
@@ -102,7 +102,7 @@ def test_correction_reprend_la_session_du_dev(tmp_path, monkeypatch):
 
     reprises = []
 
-    def dev(role, consigne, worktree, reprendre=None):
+    def dev(role, consigne, worktree, reprendre=None, modele=None):
         reprises.append(reprendre)
         (Path(worktree) / "app" / "x.py").write_text("Y = 1\n", encoding="utf-8")
         return {"ok": True, "journal": [], "texte": "fait", "session_id": "SID-123"}
@@ -212,7 +212,7 @@ def test_mission_atelier_auto_livree(tmp_path, monkeypatch):
     entrepot.init_fondations(db)
     mid = beecham.demarrer_mission("juste réfléchir, rien coder", db)
 
-    def agent_sans_code(role, consigne, worktree, reprendre=None):
+    def agent_sans_code(role, consigne, worktree, reprendre=None, modele=None):
         return {"ok": True, "journal": [], "texte": "réflexion faite"}
 
     r = beecham.executer_mission(mid, chemin=db, _agent=agent_sans_code)
@@ -221,6 +221,33 @@ def test_mission_atelier_auto_livree(tmp_path, monkeypatch):
     exe = _execution(db, mid)  # registre D-16 : livré sans code -> completed, pas de livraison
     assert exe["statut"] == "completed"
     assert exe["delivery_outcome"] is None
+
+
+def test_le_modele_choisi_par_alex_arrive_jusqu_a_l_agent(tmp_path, monkeypatch):
+    """MAILLON CENTRAL du sélecteur de l'accueil : `executer_mission(modele=...)` doit transmettre
+    le choix à l'agent. Sans ce test, on peut couper la transmission ici et garder tous les autres
+    tests verts — le sélecteur devient silencieusement sans effet (défaut relevé en revue)."""
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(beecham, "RACINE", repo)
+    monkeypatch.setattr(beecham, "WORKTREES", tmp_path / "wt")
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    db = str(tmp_path / "shadow.db")
+    entrepot.init_fondations(db)
+    mid = beecham.demarrer_mission("réfléchir avec le modèle choisi", db)
+
+    recus = []
+
+    def agent(role, consigne, worktree, reprendre=None, modele=None):
+        recus.append(modele)
+        return {"ok": True, "journal": [], "texte": "fait"}
+
+    beecham.executer_mission(mid, chemin=db, _agent=agent, modele="claude-haiku-4-5-20251001")
+    assert recus == ["claude-haiku-4-5-20251001"]
+
+    mid2 = beecham.demarrer_mission("sans choix de modèle", db)
+    recus.clear()
+    beecham.executer_mission(mid2, chemin=db, _agent=agent)
+    assert recus == [None]  # aucun choix -> l'agent retombera sur le modèle de son rôle
 
 
 def test_corriger_puis_bloque_au_plafond(tmp_path, monkeypatch):

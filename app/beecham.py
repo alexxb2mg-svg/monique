@@ -253,7 +253,7 @@ mail client vers « veilleur ».
 _MODELE_DEFAUT = "sonnet"
 _MODELES = {
     # Direction : arbitrage, stratégie, revue générale — ce qui engage tout le reste.
-    "chef": "fable",
+    "chef": "claude-fable-5",
     "stratege": "claude-opus-5",
     "auditeur": "claude-opus-5",
     # Le développeur écrit le code que tout le monde relira ensuite : une erreur ici coûte des
@@ -269,6 +269,17 @@ _MODELES = {
 def modele_pour(role: str) -> str:
     """Modèle à utiliser pour un rôle. Défaut sûr si le rôle est inconnu."""
     return _MODELES.get(role, _MODELE_DEFAUT)
+
+
+# Modèles qu'Alex peut choisir depuis l'accueil (valeur -> libellé humain). SOURCE UNIQUE : le
+# menu du formulaire ET la liste blanche du serveur lisent ce dictionnaire, ils ne peuvent donc
+# pas diverger. Le choix ne vaut que pour le chef, l'agent qui reçoit l'intention.
+MODELES_OFFERTS = {
+    "claude-fable-5": "Fable 5 — exceptionnel",
+    "claude-opus-5": "Opus 5",
+    "claude-sonnet-5": "Sonnet 5",
+    "claude-haiku-4-5-20251001": "Haiku — économique, en évaluation",
+}
 
 
 _OUTILS = {
@@ -533,7 +544,9 @@ def _archiver_canal(role, messages) -> None:
         pass
 
 
-def _porte_rapport(role, texte, worktree, session_id, journal, _relancer) -> tuple[str, list]:
+def _porte_rapport(
+    role, texte, worktree, session_id, journal, _relancer, modele=None
+) -> tuple[str, list]:
     """PORTE DE SORTIE (D-15) : le rapport de fin de mission doit porter les 4 rubriques imposées.
 
     Le contrôle vit ICI, dans le code, et non dans l'espoir que la consigne du prompt ait été
@@ -563,6 +576,7 @@ def _porte_rapport(role, texte, worktree, session_id, journal, _relancer) -> tup
         worktree,
         reprendre=session_id,
         _relancer_rapport=False,  # une seule relance : pas de boucle
+        modele=modele,  # même agent, même session : même modèle que le travail
     )
     journal += seconde.get("journal", [])
     texte_2 = seconde.get("texte", "")
@@ -573,7 +587,9 @@ def _porte_rapport(role, texte, worktree, session_id, journal, _relancer) -> tup
     return texte_2 or texte, journal
 
 
-def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=True) -> dict:
+def _lancer_agent(
+    role, consigne, worktree, reprendre=None, _relancer_rapport=True, modele=None
+) -> dict:
     """Session codeur SCOPÉE : Read/Edit/Write only (pas de Bash), cwd=worktree, aucun MCP.
     `reprendre`=<session_id> : REPREND la session claude précédente (`--resume`) au lieu d'en
     rallumer une à froid — l'agent garde sa mémoire de travail (tours de correction) et le cache
@@ -642,7 +658,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=Tr
         "stream-json",
         "--verbose",
         "--model",
-        modele_pour(role),
+        modele or modele_pour(role),  # `modele` = choix d'Alex sur l'accueil, sinon la table
         "--permission-mode",
         "acceptEdits",
         "--allowedTools",
@@ -741,7 +757,7 @@ def _lancer_agent(role, consigne, worktree, reprendre=None, _relancer_rapport=Tr
     # session déjà en échec n'apporterait rien.
     if rc == 0 and reprendre is None:
         texte, journal = _porte_rapport(
-            role, texte, worktree, session_id, journal, _relancer_rapport
+            role, texte, worktree, session_id, journal, _relancer_rapport, modele
         )
 
     _archiver_canal(role, courrier_releve)  # D-15 : le courrier lu ne revient pas au tour suivant
@@ -897,6 +913,7 @@ def executer_mission(
     _agent=None,
     _controleur=None,
     max_tours=2,
+    modele=None,
 ) -> dict:
     """Traite la mission AUTOMATIQUEMENT jusqu'à un état terminal — jamais de « propose » qui traîne :
     - pas de diff de code (mission atelier) → `livre` ;
@@ -922,7 +939,15 @@ def executer_mission(
     for tour in range(1, max_tours + 1):
         # tour > 1 : on REPREND la session du dev (--resume) — il garde sa mémoire de travail du
         # tour précédent, on ne réinjecte pas tout le contexte à froid (moins d'overhead + cache gardé).
-        res = agent(role, consigne, wt, reprendre=session_id if tour > 1 else None)
+        # `modele` (choix d'Alex sur l'accueil) ne vaut que pour CET agent : le contrôleur et les
+        # agents que la boucle lancera ensuite gardent le modèle de leur rôle.
+        res = agent(
+            role,
+            consigne,
+            wt,
+            reprendre=session_id if tour > 1 else None,
+            modele=modele,
+        )
         session_id = res.get("session_id") or session_id
         journal += res.get("journal", [])
         h = _harnais(wt)
