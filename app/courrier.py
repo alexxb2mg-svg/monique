@@ -187,8 +187,14 @@ def collecter_courrier_sortant(
     clés manquantes ou au contenu refusé par le scan de sécurité est ignoré et compté en `rejetes`
     — jamais une exception qui ferait échouer la mission entière pour un message mal formé.
 
-    Les fichiers traités ne sont ni déplacés ni supprimés : le worktree est jetable et détruit
-    juste après.
+    Les fichiers traités ne sont ni déplacés ni supprimés — inutile, `courrier_sortant/` est
+    gitignoré et le worktree est détruit après la mission.
+
+    ATTENTION, prémisse corrigée le 22/08/2026 : le worktree n'est pas seulement « jeté », il est
+    d'abord FUSIONNÉ. Sans le gitignore, le `git add -A` du harnais embarquerait ces messages dans
+    le dépôt ; chaque worktree suivant naissant depuis HEAD les contiendrait, et ce collecteur les
+    republierait à la fin de CHAQUE mission — croissance quadratique du fil. Ne jamais retirer
+    `courrier_sortant/` du .gitignore.
 
     Renvoie {"deposes": int, "fil": int, "rejetes": int}.
     """

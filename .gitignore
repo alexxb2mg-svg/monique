@@ -29,6 +29,13 @@ monique_shadow.db-shm
 # Spillover : peut contenir des corps de messages (IBAN/RIB) — hors versionnement
 spillover/
 
+# Boîte d'envoi des agents : collectée en fin de session, JAMAIS versionnée.
+# Le harnais fait `git add -A` avant de calculer le diff, et chaque worktree naît depuis HEAD :
+# un message fusionné reviendrait donc dans TOUS les worktrees suivants, où le collecteur le
+# republierait à la fin de chaque mission — croissance quadratique du fil injecté en tête de
+# prompt de tous les agents. Bug trouvé par le contrôleur le 22/08/2026, reproduit avant correctif.
+courrier_sortant/
+
 # Journaux & logs : activité de la machine, pas du projet
 *.log
 *_audit*

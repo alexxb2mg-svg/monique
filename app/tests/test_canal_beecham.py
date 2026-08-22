@@ -3,6 +3,8 @@
 Ne teste PAS la session claude elle-même (jamais lancée ici) : seulement la relève, la mise en
 forme du contexte injecté, et l'archivage."""
 
+import subprocess
+
 import beecham
 import coordination
 import courrier
@@ -99,6 +101,32 @@ def test_collecte_sortant_depose_et_publie(tmp_path):
     assert recus[0]["corps"] == "Mission terminee"
     assert recus[0]["expediteur"] == "developpeur"
     assert len(coordination.lire_fil_non_lu(db_f, "auditeur")) == 1
+
+
+def test_la_boite_d_envoi_reste_hors_du_depot():
+    """Bug trouvé par le contrôleur le 22/08/2026, reproduit avant correctif.
+
+    Le harnais fait `git add -A` avant de calculer le diff, et chaque worktree naît depuis HEAD.
+    Sans gitignore, un message d'agent partirait au commit puis à la fusion — et reviendrait
+    ensuite dans TOUS les worktrees suivants, où le collecteur le republierait à la fin de chaque
+    mission. Croissance quadratique du fil injecté en tête de prompt de tous les agents.
+
+    Aucun des 451 tests ne couvrait ce chemin : ils testaient le collecteur sur un `tmp_path`,
+    jamais le côté git. C'était précisément l'angle mort.
+    """
+    from pathlib import Path
+
+    racine = Path(__file__).parent.parent.parent
+    gitignore = (racine / ".gitignore").read_text(encoding="utf-8")
+    assert "courrier_sortant/" in gitignore
+
+    suivis = subprocess.run(
+        ["git", "ls-files", "courrier_sortant/"],
+        cwd=str(racine),
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert suivis == "", f"des messages d'agents sont versionnés : {suivis}"
 
 
 def test_collecte_sortant_sans_dossier_ne_leve_pas(tmp_path):
