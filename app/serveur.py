@@ -607,6 +607,10 @@ def intention(request: Request, intention: str = Form(...)):
     texte = (intention or "").strip()
     if not texte:
         return tpl.TemplateResponse(request, "vue_jour.html", {"brief": brief.construire()})
+    # Deux effets, complémentaires : la demande est DÉPOSÉE dans l'inbox produit (elle survit, et
+    # une vague ultérieure la reprendra même si aucune boucle ne tourne maintenant), ET une mission
+    # part tout de suite pour y réfléchir sans attendre la prochaine vague.
+    beecham.deposer_demande(texte)
     mid = beecham.demarrer_mission(texte)
     threading.Thread(
         target=beecham.executer_mission, args=(mid, "chef"), daemon=True

@@ -87,6 +87,33 @@ def journal_ajouter(agent, resume, statut) -> None:
         pass
 
 
+DEMANDES = ATELIER / "demandes_alex.md"
+
+
+def deposer_demande(texte) -> None:
+    """Dépose une intention d'Alex dans l'inbox produit (`demandes_alex.md`), que le
+    planificateur lit déjà comme cap avant chaque vague.
+
+    Pourquoi un fichier plutôt qu'un appel direct : une demande doit SURVIVRE aux redémarrages et
+    pouvoir être reprise par une vague ultérieure, même si aucune boucle ne tourne au moment où
+    Alex la formule. C'est le patron que documente Hermes Agent pour son Kanban — « use it when
+    work crosses agent boundaries, needs to survive restarts, might need human input » — par
+    opposition à une délégation directe, qui est bloquante et se perd si personne n'écoute.
+
+    Fail-soft, comme `journal_ajouter` : une erreur d'écriture ne doit jamais faire échouer la
+    requête d'Alex.
+    """
+    texte = (texte or "").strip()
+    if not texte:
+        return
+    init_atelier()
+    try:
+        with open(DEMANDES, "a", encoding="utf-8") as f:
+            f.write(f"\n## Demande du {_now()[:16].replace('T', ' à ')}\n{texte}\n")
+    except OSError:
+        pass
+
+
 def chemin_memoire(role) -> Path:
     """Chemin de la note mémoire d'un agent-persona (atelier/memoire/<role>.md), créée avec
     un en-tête si elle manque."""
