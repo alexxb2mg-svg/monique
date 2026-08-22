@@ -5,7 +5,17 @@ arbitrer une architecture. La table est une DONNÉE lisible et modifiable, pas u
 au moment de l'exécution — même logique que partout ailleurs dans ce harnais.
 """
 
+import pytest
+
 import beecham
+
+
+@pytest.fixture(autouse=True)
+def _atelier_isole(monkeypatch, tmp_path):
+    """Les modèles se lisent dans `atelier/modeles.json` : ces tests portent sur les DÉFAUTS du
+    code, ils ne doivent dépendre ni de la config d'Alex ni en semer une dans l'atelier réel."""
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    monkeypatch.setattr(beecham, "_DERNIER_FICHIER", "\x00jamais lu")
 
 
 def test_le_chef_arbitre_avec_le_modele_le_plus_capable():
@@ -96,7 +106,7 @@ def test_le_modele_est_bien_passe_a_la_commande(monkeypatch, tmp_path):
 
 def test_les_modeles_offerts_sur_l_accueil_sont_lancables():
     """Le menu d'Alex ne doit proposer que des valeurs que `claude --model` accepte."""
-    for valeur, libelle in beecham.MODELES_OFFERTS.items():
+    for valeur, libelle in beecham.modeles_offerts().items():
         assert valeur.startswith("claude-"), valeur
         assert libelle.strip(), valeur
 

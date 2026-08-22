@@ -24,6 +24,10 @@ def _jamais_la_vraie_inbox(monkeypatch, tmp_path):
     dépendant de la vigilance à chaque nouveau test.
     """
     monkeypatch.setattr(beecham, "DEMANDES", tmp_path / "demandes_alex.md")
+    # Même garde-fou pour le menu des modèles : il se lit dans `atelier/modeles.json`, ces tests
+    # portent sur les défauts du code et ne doivent rien semer dans l'atelier réel.
+    monkeypatch.setattr(beecham, "ATELIER", tmp_path / "atelier")
+    monkeypatch.setattr(beecham, "_DERNIER_FICHIER", "\x00jamais lu")
 
 
 def test_l_accueil_propose_de_dire_quelque_chose_a_monique():
@@ -89,7 +93,7 @@ def test_un_modele_hors_liste_blanche_est_ignore(monkeypatch):
 def test_l_accueil_offre_les_modeles_avec_fable_par_defaut():
     page = client.get("/").text
     assert 'name="modele"' in page
-    for valeur, libelle in beecham.MODELES_OFFERTS.items():
+    for valeur, libelle in beecham.modeles_offerts().items():
         assert valeur in page and libelle in page
     # première option = celle qu'un navigateur présélectionne
     assert page.index("claude-fable-5") < page.index("claude-opus-5")

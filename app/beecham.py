@@ -303,9 +303,10 @@ mail client vers « veilleur ».
 # payait le même prix pour trier un fichier que pour arbitrer une architecture. On paie désormais
 # selon la difficulté réelle de la tâche.
 #
-# Le harnais ne CHOISIT pas : il applique une table. C'est la même logique que partout ailleurs
-# ici — une décision structurante reste une donnée lisible et modifiable, pas un jugement d'un LLM
-# au moment de l'exécution.
+# Le harnais ne CHOISIT pas : il applique une table, et cette table est une DONNÉE — pas du code.
+# Les valeurs ci-dessous ne sont que les DÉFAUTS de secours : la table qui fait foi vit dans
+# `atelier/modeles.json`, qu'Alex édite sans rouvrir le code ni redémarrer le serveur (relu à
+# chaque appel). Même principe que les critères d'évaluation du harnais : configuration, pas code.
 _MODELE_DEFAUT = "sonnet"
 _MODELES = {
     # Direction : arbitrage, stratégie, revue générale — ce qui engage tout le reste.
@@ -320,22 +321,165 @@ _MODELES = {
     "controleur": "claude-opus-5",
     # Les autres restent sur le défaut (sonnet) : lecture, veille, mise en forme, surveillance.
 }
-
-
-def modele_pour(role: str) -> str:
-    """Modèle à utiliser pour un rôle. Défaut sûr si le rôle est inconnu."""
-    return _MODELES.get(role, _MODELE_DEFAUT)
-
-
 # Modèles qu'Alex peut choisir depuis l'accueil (valeur -> libellé humain). SOURCE UNIQUE : le
-# menu du formulaire ET la liste blanche du serveur lisent ce dictionnaire, ils ne peuvent donc
-# pas diverger. Le choix ne vaut que pour le chef, l'agent qui reçoit l'intention.
-MODELES_OFFERTS = {
+# menu du formulaire ET la liste blanche du serveur lisent `modeles_offerts()`, ils ne peuvent
+# donc pas diverger. Le choix ne vaut que pour le chef, l'agent qui reçoit l'intention.
+_OFFERTS_DEFAUT = {
     "claude-fable-5": "Fable 5 — exceptionnel",
     "claude-opus-5": "Opus 5",
     "claude-sonnet-5": "Sonnet 5",
     "claude-haiku-4-5-20251001": "Haiku — économique, en évaluation",
 }
+_CLES_MODELES = {"_lisezmoi", "defaut", "par_role", "offerts"}
+_LISEZMOI_MODELES = (
+    "Qui répond, et avec quel modèle. Éditez librement : relu à chaque lancement d'agent, "
+    "aucun redémarrage. « defaut » s'applique aux rôles absents de « par_role » ; « offerts » "
+    "est le menu de l'accueil ET la liste blanche du serveur. Une entrée mal formée est ignorée "
+    "et signalée dans le journal — jamais en silence, jamais bloquante."
+)
+# Dernier contenu vu du fichier : sert UNIQUEMENT à ne pas répéter le même avertissement à chaque
+# mission. Sentinelle distincte de None, qui signifie « fichier absent ou illisible ».
+_DERNIER_FICHIER = "\x00jamais lu"
+
+
+def _valide(modele) -> bool:
+    """Un nom de modèle plausible — et surtout PAS une option déguisée : cette valeur finit en
+    argument de `claude --model`. Pas de tiret en tête, rien d'exotique."""
+    return isinstance(modele, str) and bool(
+        re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", modele)
+    )
+
+
+def _semer_modeles(fichier: Path, defauts: dict) -> None:
+    """Dépose le fichier de config avec les valeurs du code : Alex a quelque chose à éditer
+    plutôt qu'une page blanche. Silencieux si l'écriture échoue — ce n'est qu'un confort."""
+    try:
+        fichier.parent.mkdir(parents=True, exist_ok=True)
+        fichier.write_text(
+            json.dumps(
+                {"_lisezmoi": _LISEZMOI_MODELES, **defauts}, ensure_ascii=False, indent=2
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def _config_modeles() -> dict:
+    """Table des modèles, relue À CHAQUE APPEL depuis `atelier/modeles.json`.
+
+    FAIL-SOFT : fichier absent (alors semé avec les défauts), illisible ou mal formé => les
+    valeurs du code. Rien ne s'arrête parce qu'un JSON est mal recollé. Mais rien n'est ignoré
+    en SILENCE non plus : chaque anomalie est signalée dans le journal — une fois par version du
+    fichier, sinon l'avertissement se répéterait à chaque mission.
+    """
+    global _DERNIER_FICHIER
+    fichier = ATELIER / "modeles.json"  # recalculé : ATELIER est substituable en test
+    # ABSENT et ILLISIBLE sont deux états distincts, et c'est tout l'intérêt de séparer `exists()`
+    # de `read_text()` : absent => on sème un exemple ; présent mais illisible (droits, ou octets
+    # non décodables en UTF-8) => on ne réécrit RIEN, sinon on écraserait la config d'Alex à cause
+    # d'un ennui de lecture. UnicodeDecodeError hérite de ValueError, pas d'OSError : d'où les deux
+    # dans le `except` — sans ça un fichier mal encodé faisait remonter l'erreur et bloquait tout.
+    texte = illisible = None
+    if fichier.exists():
+        try:
+            texte = fichier.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            illisible = e
+
+    empreinte = texte if texte is not None else ("\x00illisible" if illisible else None)
+    nouveau = empreinte != _DERNIER_FICHIER
+    _DERNIER_FICHIER = empreinte
+
+    def signaler(msg, *args):
+        if nouveau:
+            LOG.warning("modeles.json : " + msg, *args)
+
+    cfg = {
+        "defaut": _MODELE_DEFAUT,
+        "par_role": dict(_MODELES),
+        "offerts": dict(_OFFERTS_DEFAUT),
+    }
+    if illisible is not None:
+        signaler("illisible (%s), modèles du code utilisés — le fichier n'est PAS touché", illisible)
+        return cfg
+    if texte is None:
+        _semer_modeles(fichier, cfg)
+        return cfg
+    try:
+        brut = json.loads(texte)
+    except ValueError as e:  # JSONDecodeError en hérite
+        signaler("JSON invalide (%s), les modèles du code sont utilisés", e)
+        return cfg
+    if not isinstance(brut, dict):
+        signaler("le fichier doit contenir un objet, les modèles du code sont utilisés")
+        return cfg
+    for cle in sorted(set(brut) - _CLES_MODELES):
+        # Se tromper de nom de section est l'erreur la plus probable en éditant du JSON à la main.
+        signaler(
+            "clé inconnue « %s » ignorée (attendu : %s)",
+            cle,
+            ", ".join(sorted(_CLES_MODELES)),
+        )
+
+    defaut = brut.get("defaut", _MODELE_DEFAUT)
+    if _valide(defaut):
+        cfg["defaut"] = defaut
+    else:
+        signaler("« defaut » invalide (%r), « %s » conservé", defaut, _MODELE_DEFAUT)
+
+    # Sections absentes = « je ne configure pas ça » : les défauts du code, sans un mot. Seul ce
+    # qui est PRÉSENT et mal formé est signalé.
+    par_role = brut.get("par_role")
+    if par_role is None:
+        pass
+    elif isinstance(par_role, dict):
+        retenus = {}
+        for role, m in par_role.items():
+            if _valide(m):
+                retenus[role] = m
+            else:
+                signaler("« par_role.%s » invalide (%r), ignoré", role, m)
+        cfg["par_role"] = retenus
+    else:
+        signaler(
+            "« par_role » doit être un objet (reçu : %s), table du code conservée",
+            type(par_role).__name__,
+        )
+
+    offerts = brut.get("offerts")
+    if offerts is None:
+        pass
+    elif isinstance(offerts, dict):
+        retenus = {}
+        for valeur, libelle in offerts.items():
+            if _valide(valeur) and isinstance(libelle, str) and libelle.strip():
+                retenus[valeur] = libelle
+            else:
+                signaler("« offerts.%s » invalide (%r), ignoré", valeur, libelle)
+        if retenus:
+            cfg["offerts"] = retenus
+        else:
+            # Un menu vide casserait l'accueil : là, on garde celui du code.
+            signaler("« offerts » ne retient aucune entrée, menu du code conservé")
+    else:
+        signaler(
+            "« offerts » doit être un objet (reçu : %s), menu du code conservé",
+            type(offerts).__name__,
+        )
+    return cfg
+
+
+def modele_pour(role: str) -> str:
+    """Modèle à utiliser pour un rôle. Défaut sûr si le rôle est inconnu."""
+    cfg = _config_modeles()
+    return cfg["par_role"].get(role, cfg["defaut"])
+
+
+def modeles_offerts() -> dict:
+    """Menu des modèles proposés sur l'accueil (valeur -> libellé), qui sert AUSSI de liste
+    blanche au serveur : une seule source, elles ne peuvent pas diverger."""
+    return _config_modeles()["offerts"]
 
 
 _OUTILS = {

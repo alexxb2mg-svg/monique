@@ -4,7 +4,7 @@
   <textarea name="intention" rows="2" required
             placeholder="Dites à Monique ce qu'il faudrait faire — elle décide qui s'en occupe."></textarea>
   <select name="modele" aria-label="Modèle qui répond">
-    {% for valeur, libelle in modeles_offerts.items() %}
+    {% for valeur, libelle in modeles_offerts().items() %}
     <option value="{{ valeur }}">{{ libelle }}</option>
     {% endfor %}
   </select>

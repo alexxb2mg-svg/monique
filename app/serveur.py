@@ -52,8 +52,10 @@ def _en_retard(echeance: str | None) -> bool:
 
 
 tpl.env.globals["en_retard"] = _en_retard
-# Menu « modèle » de l'accueil : même dictionnaire que la liste blanche de /intention.
-tpl.env.globals["modeles_offerts"] = beecham.MODELES_OFFERTS
+# Menu « modèle » de l'accueil : même source que la liste blanche de /intention. Passé comme
+# FONCTION (appelée au rendu), pour qu'une édition d'`atelier/modeles.json` se voie sans
+# redémarrer le serveur.
+tpl.env.globals["modeles_offerts"] = beecham.modeles_offerts
 # Missions bloquées + raison du contrôleur, pour l'accueil. Appelé au rendu (lambda, pas la
 # fonction elle-même) : la source reste substituable en test, et le fail-soft vit dans beecham.
 tpl.env.globals["missions_bloquees"] = lambda: beecham.missions_bloquees()
@@ -620,7 +622,7 @@ def intention(request: Request, intention: str = Form(...), modele: str = Form("
     mid = beecham.demarrer_mission(texte)
     # LISTE BLANCHE : le formulaire n'est jamais cru sur parole — cette valeur finit en argument
     # de `claude --model`. Hors liste (ou vide) => le modèle du rôle, jamais ce qui a été posté.
-    choisi = modele if modele in beecham.MODELES_OFFERTS else None
+    choisi = modele if modele in beecham.modeles_offerts() else None
     threading.Thread(
         target=beecham.executer_mission,
         args=(mid, "chef"),
