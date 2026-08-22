@@ -54,6 +54,9 @@ def _en_retard(echeance: str | None) -> bool:
 tpl.env.globals["en_retard"] = _en_retard
 # Menu « modèle » de l'accueil : même dictionnaire que la liste blanche de /intention.
 tpl.env.globals["modeles_offerts"] = beecham.MODELES_OFFERTS
+# Missions bloquées + raison du contrôleur, pour l'accueil. Appelé au rendu (lambda, pas la
+# fonction elle-même) : la source reste substituable en test, et le fail-soft vit dans beecham.
+tpl.env.globals["missions_bloquees"] = lambda: beecham.missions_bloquees()
 
 
 def _reconciliation_periodique(intervalle=900):

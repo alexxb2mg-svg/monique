@@ -246,6 +246,11 @@ button.cb:active{transform:translateY(0)}
 @media(max-width:640px){.poulsgrid{grid-template-columns:1fr}}
 .pouls-item{font-size:13px;color:var(--encre);padding:6px 0;border-bottom:1px solid var(--regle);line-height:1.35;
   display:flex;gap:8px;align-items:baseline}
+/* Mission bloquée : le verdict du contrôleur, replié. Une mission bloquée dit POURQUOI. */
+.bloque{margin-top:8px;font-size:13px}
+.bloque summary{cursor:pointer;color:var(--alerte);font-weight:700}
+.bloque pre{white-space:pre-wrap;font-size:12px;color:var(--grisdoux);margin:6px 0 0;
+  padding:8px 10px;background:var(--fond);border:1px solid var(--regle);border-radius:8px}
 
 /* ===== Logo Monique (visage) dans l'en-tete ===== */
 .marque{display:flex;align-items:center;gap:9px}

@@ -141,6 +141,61 @@ def _graver_lecon_rejet(consigne, raison) -> None:
         pass
 
 
+def ecrire_verdict(mission_id, role, verdict, raison) -> None:
+    """Conserve la raison COMPLÈTE du contrôleur dans `atelier/verdicts/<mission_id>.md`.
+
+    `executions.finir` n'en garde que 200 caractères ; le reste — la démonstration chiffrée, la
+    correction, souvent le test de non-régression écrit clé en main — repartait sur le stdout du
+    processus et mourait avec lui. Le 22/08, savoir pourquoi une mission était bloquée a demandé
+    de RELANCER le contrôleur entier sur le diff : un appel de modèle complet pour relire une
+    information produite vingt minutes plus tôt.
+
+    Append : un bloc par verdict (accepté compris), jamais écrasé. Fail-soft, comme
+    `journal_ajouter`. `ATELIER` est relu à CHAQUE appel, jamais figé à l'import (régression C3)."""
+    try:
+        dossier = ATELIER / "verdicts"
+        dossier.mkdir(parents=True, exist_ok=True)
+        with open(dossier / f"{mission_id}.md", "a", encoding="utf-8") as f:
+            f.write(f"\n## {_now()} · {role} · {verdict}\n\n{raison}\n")
+    except OSError:
+        pass
+
+
+def missions_bloquees(limit=20) -> list[dict]:
+    """Missions `bloque` AVEC la raison du contrôleur, pour l'accueil : une mission bloquée doit
+    dire pourquoi, pas seulement grossir le compteur « rejetés / échecs ». On garde la FIN du
+    fichier de verdict (le dernier tour, celui qui a bloqué).
+
+    Lecture seule et fail-soft POUR DE VRAI : c'est un chemin de RENDU de l'accueil (poll HTMX
+    toutes les 3 s), donc la règle SPEC §16 s'applique — jamais un 500 sur une vue. Deux étages,
+    comme `contexte_usage`/`lister_missions` :
+    - un verdict illisible (fichier corrompu, encodage cassé — `UnicodeDecodeError` n'est PAS une
+      `OSError`) ne fait perdre que SA raison, les autres missions restent affichées ;
+    - toute autre défaillance (import de `monitoring`, base verrouillée sous contention) rend une
+      liste vide : l'accueil perd le dépliant, jamais la page."""
+    try:
+        import monitoring  # import paresseux : monitoring importe beecham (cycle au boot sinon)
+
+        out = []
+        for m in lister_missions(limit=limit):
+            if m.get("statut") != "bloque":
+                continue
+            try:
+                verdict = (ATELIER / "verdicts" / f"{m['id']}.md").read_text(encoding="utf-8")
+            except Exception:
+                verdict = ""
+            out.append(
+                {
+                    "id": m["id"],
+                    "sujet": monitoring._sujet(m.get("consigne", "")),
+                    "raison": _tronquer(verdict, 900, queue=True),
+                }
+            )
+        return out
+    except Exception:
+        return []
+
+
 def zone_ecriture_autorisee(chemin: str, zones: list[str]) -> bool:
     """LE garde-fou (logique) : une écriture n'est permise que SOUS l'une des zones autorisées
     (worktree de la mission + atelier). Tout le reste — dossiers de production inclus — est REFUSÉ.
@@ -729,6 +784,46 @@ def _porte_rapport(
     return texte_2 or texte, journal
 
 
+def _compter_usage(role, modele, ev) -> None:
+    """Enregistre la consommation RÉELLE d'une session claude dans `secw_model_usage`, lue dans
+    l'événement final `result` du flux stream-json (`usage` + `total_cost_usd`, chiffrés par la
+    CLI elle-même). Sans ça, aucune mission Beecham n'écrivait dans la table : le coût du système
+    n'existait que sous forme de calculs à la main — on optimisait à l'aveugle.
+
+    La table AGRÈGE par (agent, model, provider, task), d'où `agent=beecham:<role>` et
+    `task='mission'` : une ligne par rôle ET par modèle, dont les totaux restent divisibles par
+    `calls` — c'est ce qui permettra de comparer Haiku à Opus à tâche égale. Elle n'a pas de
+    colonne pour les tokens de CRÉATION de cache : ils sont comptés avec l'input (c'est ce qu'ils
+    sont), sinon le poste le plus lourd d'une session disparaîtrait du relevé.
+
+    `usage.compter` avale déjà ses exceptions ; le try ci-dessous ne couvre que la LECTURE de
+    l'événement — un flux sans `usage` ou malformé ne doit pas faire échouer la mission."""
+    import usage
+
+    try:
+        u = ev["usage"]
+        entree = (u.get("input_tokens") or 0) + (
+            u.get("cache_creation_input_tokens") or 0
+        )
+        sortie = u.get("output_tokens") or 0
+        cache_read = u.get("cache_read_input_tokens") or 0
+    except Exception:
+        return
+    usage.compter(
+        f"beecham:{role}",
+        modele,
+        "claude_cli",
+        "mission",
+        entree,
+        sortie,
+        cache_read=cache_read,
+        # même convention que cerveau.py : en claude_cli le coût est couvert par l'abonnement,
+        # et ce chiffre-ci vient de la CLI, ce n'est pas une estimation de notre part.
+        cost_status="included",
+        estimated_cost_usd=ev.get("total_cost_usd") or 0.0,
+    )
+
+
 def _lancer_agent(
     role, consigne, worktree, reprendre=None, _relancer_rapport=True, modele=None
 ) -> dict:
@@ -875,6 +970,7 @@ def _lancer_agent(
                     texte += bloc.get("text", "")
         elif ev.get("type") == "result":
             texte = ev.get("result", texte)
+            _compter_usage(role, modele or modele_pour(role), ev)
     # PORTE DE SORTIE : le rapport passe le contrôle de format, ou l'agent est renvoyé le refaire.
     # Seulement sur une mission menée à son terme (rc==0) et à froid : relancer le rapport d'une
     # session déjà en échec n'apporterait rien.
@@ -1089,6 +1185,10 @@ def executer_mission(
             v = controle(m["consigne"], h["diff"], h["tests_resume"], wt)
             verdict, raison = v["verdict"], v["raison"]
             journal.append(f"controleur · {verdict}")
+        # la raison ENTIÈRE est conservée sur disque : `executions.finir` plus bas n'en garde que
+        # 200 caractères, et c'est le produit le plus utile du harnais. Les deux branches sont
+        # couvertes : un blocage sur tests rouges doit lui aussi dire pourquoi.
+        ecrire_verdict(mission_id, role, verdict, raison)
 
         if verdict == "accepte":
             ok = _fusion_locale(m["branche"], wt, mission_id)
