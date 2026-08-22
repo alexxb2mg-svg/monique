@@ -7,6 +7,7 @@ from datetime import datetime
 import actions
 import cerveau
 import config
+import contrats
 import jsonutil
 import overlays
 import roles
@@ -94,6 +95,14 @@ def envoyer_staging(event_id, chemin=None) -> dict:
     b = overlays.lire_brouillon(event_id, chemin)
     if not b:
         return {"ok": False, "erreur": "aucun_brouillon"}
+    # Contrats AVANT toute écriture : un refus ne doit laisser aucune trace en base.
+    # `is_draft=True` = déclaration honnête de ce que fait cette fonction — rien ne part,
+    # l'obligation reste `pending` jusqu'à un geste humain.
+    ok, raison = contrats.valider(
+        {"type": "envoi_externe", "is_draft": True, "texte": b["brouillon"] or ""}
+    )
+    if not ok:
+        return {"ok": False, "erreur": "contrat_refuse", "raison": raison}
     con = connexion_ecriture(chemin)
     try:
         h = hashlib.sha1((b["brouillon"] or "").encode("utf-8", "replace")).hexdigest()[
