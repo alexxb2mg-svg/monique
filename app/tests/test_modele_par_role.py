@@ -10,7 +10,7 @@ import beecham
 
 def test_le_chef_arbitre_avec_le_modele_le_plus_capable():
     """Le chef fait la revue générale et tranche : c'est lui qui engage tout le reste."""
-    assert beecham.modele_pour("chef") == "fable"
+    assert beecham.modele_pour("chef") == "claude-fable-5"
 
 
 def test_les_roles_exigeants_ont_un_modele_haut_de_gamme():
@@ -76,12 +76,42 @@ def test_le_modele_est_bien_passe_a_la_commande(monkeypatch, tmp_path):
     monkeypatch.setattr(beecham, "_archiver_canal", lambda role, m: None)
     monkeypatch.setattr(beecham, "_collecter_canal", lambda role, wt: {"deposes": 0, "fil": 0, "rejetes": 0})
 
-    def _modele_utilise(role):
+    def _modele_utilise(role, **kw):
         appels.clear()
-        beecham._lancer_agent(role, "une consigne", str(tmp_path))
+        beecham._lancer_agent(role, "une consigne", str(tmp_path), **kw)
         claude = next(c for c in appels if c and c[0] == "claude")
         return claude[claude.index("--model") + 1]
 
-    assert _modele_utilise("chef") == "fable"
+    assert _modele_utilise("chef") == "claude-fable-5"
     assert _modele_utilise("developpeur") == "claude-opus-5"
     assert _modele_utilise("chercheur") == "sonnet"
+    # choix d'Alex sur l'accueil : il prime sur la table...
+    assert _modele_utilise("chef", modele="claude-haiku-4-5-20251001") == "claude-haiku-4-5-20251001"
+    # ...mais l'absence de choix ne doit surtout pas vider `--model`.
+    assert _modele_utilise("chef", modele=None) == "claude-fable-5"
+
+
+# --- le choix d'Alex ne se perd pas en route ----------------------------------------------------
+
+
+def test_les_modeles_offerts_sur_l_accueil_sont_lancables():
+    """Le menu d'Alex ne doit proposer que des valeurs que `claude --model` accepte."""
+    for valeur, libelle in beecham.MODELES_OFFERTS.items():
+        assert valeur.startswith("claude-"), valeur
+        assert libelle.strip(), valeur
+
+
+def test_la_relance_du_rapport_garde_le_modele_choisi(monkeypatch):
+    """La porte de sortie renvoie l'agent à SA session : elle doit le rallumer sur le modèle qu'Alex
+    a choisi, sinon le rapport repart sur un autre modèle que le travail."""
+    vus = []
+
+    def faux_lancer(role, consigne, worktree, reprendre=None, _relancer_rapport=True, modele=None):
+        vus.append(modele)
+        return {"ok": True, "journal": [], "texte": "prose", "session_id": reprendre}
+
+    monkeypatch.setattr(beecham, "_lancer_agent", faux_lancer)
+    beecham._porte_rapport(
+        "chef", "un rapport non conforme", "/wt", "sess-9", [], True, "claude-opus-5"
+    )
+    assert vus == ["claude-opus-5"]
