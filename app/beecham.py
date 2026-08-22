@@ -319,6 +319,9 @@ _MODELES = {
     "chef_dev": "claude-opus-5",
     # Contrôle adversarial : trouver ce qui casse demande plus qu'exécuter.
     "controleur": "claude-opus-5",
+    # Le conseil répond aux QUESTIONS d'un agent en doute (cf. _porte_consultation) : rare, court,
+    # et c'est précisément là qu'un modèle plus puissant vaut son prix.
+    "conseil": "claude-fable-5",
     # Les autres restent sur le défaut (sonnet) : lecture, veille, mise en forme, surveillance.
 }
 # Modèles qu'Alex peut choisir depuis l'accueil (valeur -> libellé humain). SOURCE UNIQUE : le
@@ -474,6 +477,16 @@ def modele_pour(role: str) -> str:
     """Modèle à utiliser pour un rôle. Défaut sûr si le rôle est inconnu."""
     cfg = _config_modeles()
     return cfg["par_role"].get(role, cfg["defaut"])
+
+
+def modele_conseil() -> str:
+    """Modèle du conseil (`_porte_consultation`). Ne passe PAS par `modele_pour` : le
+    `atelier/modeles.json` d'Alex existe déjà, son « par_role » REMPLACE la table du code et ne
+    connaît pas « conseil » — le conseil serait lancé sur le défaut général (sonnet), donc plus
+    faible que le demandeur, en silence. Secours explicite sur la table du code ; Alex garde la
+    main en ajoutant « conseil » à son fichier. Fable 5 est ici un œil DIFFÉRENT (modèle
+    d'arbitrage de la brigade), pas forcément « plus puissant » qu'Opus 5."""
+    return _config_modeles()["par_role"].get("conseil", _MODELES["conseil"])
 
 
 def modeles_offerts() -> dict:
@@ -755,10 +768,28 @@ _CONSIGNE_COURRIER_SORTANT = (
 )
 
 
+# Dossier (dans le worktree, gitignoré) où un agent DÉPOSE une question au lieu de deviner.
+# Veille : Hermes Agent fait le choix INVERSE — `clarify` est BLOQUÉ pour leurs sous-agents. Leur
+# raison ne tient pas ici : leurs sous-agents partent d'une page blanche et n'ont personne à
+# consulter ; les nôtres ont des personas et des modèles différents, et un conseil plus puissant
+# à portée. Divergence assumée — ne pas « corriger » en retirant ce droit.
+DOSSIER_QUESTIONS = "questions"
+_CONSIGNE_QUESTION = (
+    "\n\nTu peux POSER UNE QUESTION plutôt que de deviner ou de bloquer : dépose un fichier JSON "
+    f"dans le dossier `{DOSSIER_QUESTIONS}/` à la racine de ta copie isolée, au format "
+    '{"question": "..."}. Un conseil extérieur (œil neuf, modèle plus puissant) y répondra et tu '
+    "seras relancé dans ta session avec sa réponse. Demande quand le doute porte sur "
+    "l'INTENTION : deux lectures possibles de la consigne, un choix qui engage, un cas non prévu. "
+    "Ne demande PAS ce que tu peux lire toi-même (tu as Read, Grep et les chemins absolus). "
+    "Demande AVANT d'écrire, pas après — une question posée sur du code déjà écrit ne sert à rien. "
+    "Une seule consultation par mission."
+)
+
+
 def _consignes_fixes() -> str:
     """Bloc INVARIANT du prompt de mission : cadre de travail, chemin de l'atelier, courrier
-    sortant, format du rapport. Même texte à chaque lancement, quel que soit le rôle et la
-    consigne. Placé en TÊTE du prompt ; le variable (carte, canal, consigne) vient APRÈS."""
+    sortant, droit de question, format du rapport. Même texte à chaque lancement, quel que soit le
+    rôle et la consigne. Placé en TÊTE du prompt ; le variable (carte, canal, consigne) vient APRÈS."""
     return (
         "Tu travailles dans une COPIE ISOLÉE du dépôt Monique. Modifie uniquement les fichiers "
         "nécessaires, proprement. Ne lance aucune commande (tu n'as pas de shell) : les tests "
@@ -769,9 +800,83 @@ def _consignes_fixes() -> str:
         "chemin relatif atelier/... depuis ta copie isolée écrirait dans un dossier jetable, "
         "invisible et détruit à la fin de la mission."
         + _CONSIGNE_COURRIER_SORTANT
+        + _CONSIGNE_QUESTION
         + _CONSIGNE_RAPPORT
         + "\n\n"
     )
+
+
+def _relever_questions(worktree) -> list[str]:
+    """Relève ET CONSOMME les questions déposées dans `<worktree>/questions/`.
+
+    INVARIANT : à la fin de TOUTE session, ce dossier est VIDE. Le worktree n'appartient pas à
+    celui qui y dépose — le contrôleur y est lancé à froid juste après le développeur, dans le
+    MÊME dossier : une question laissée derrière serait ramassée par quelqu'un d'autre (six
+    tentatives ont échoué là-dessus). D'où : chaque fichier est SUPPRIMÉ là où il est lu, HORS du
+    `try` de parsing — un JSON cassé disparaît aussi, il n'emporte ni les autres ni la mission.
+    Fail-soft intégral : rien ici ne fait échouer une session."""
+    dossier = Path(worktree) / DOSSIER_QUESTIONS
+    try:
+        fichiers = sorted(dossier.iterdir()) if dossier.is_dir() else []
+    except OSError:
+        return []
+    questions = []
+    for f in fichiers:
+        try:
+            brut = json.loads(f.read_text(encoding="utf-8"))
+            q = brut.get("question") if isinstance(brut, dict) else None
+            if isinstance(q, str) and q.strip():
+                questions.append(q.strip())
+        except Exception:
+            pass
+        try:
+            f.unlink()
+        except OSError:
+            pass
+    return questions
+
+
+def _porte_consultation(role, questions, texte, worktree, session_id, journal, modele):
+    """PORTE DE CONSULTATION : le demandeur a posé une question ; un CONSEIL (rôle emprunté
+    `stratege`, modèle `conseil` de la table, lecture seule) y répond, puis le demandeur est
+    RELANCÉ dans sa session (`--resume`) avec la réponse. UNE seule consultation par mission :
+    la relance est une session reprise, qui n'a pas de porte de consultation. Fail-soft : un
+    conseil qui échoue ne fait pas échouer la mission, le demandeur garde son travail et son
+    rapport d'origine. Renvoie (texte, journal, session_id)."""
+    try:
+        journal.append(f"{role} · {len(questions)} question(s) -> conseil")
+        corps = "\n\n".join(f"- {q}" for q in questions)
+        conseil = _lancer_agent(
+            "stratege",
+            f"Un agent « {role} » en mission te demande conseil avant d'écrire. Tu as un œil "
+            "extérieur et un accès en LECTURE à sa copie de travail (répertoire courant). Réponds "
+            "directement et précisément à sa question, en français, sans détour : il reprendra "
+            "son travail avec ta réponse.\n\nSA QUESTION :\n" + corps,
+            worktree,
+            modele=modele_conseil(),
+            service=True,
+        )
+        journal += conseil.get("journal", [])
+        reponse = (conseil.get("texte") or "").strip()
+        if not conseil.get("ok") or not reponse or not session_id:
+            journal.append(f"{role} · consultation sans réponse, mission poursuivie")
+            return texte, journal, session_id
+        suite = _lancer_agent(
+            role,
+            "RÉPONSE DU CONSEIL à ta question :\n" + reponse + "\n\nPoursuis ta mission avec "
+            "cette réponse. Le travail déjà fait est conservé." + _CONSIGNE_RAPPORT,
+            worktree,
+            reprendre=session_id,
+            _relancer_rapport=False,
+            modele=modele,
+        )
+        journal += suite.get("journal", [])
+        if suite.get("ok"):
+            return suite.get("texte") or texte, journal, suite.get("session_id") or session_id
+        journal.append(f"{role} · relance après consultation en échec, rapport d'origine gardé")
+    except Exception as e:
+        journal.append(f"{role} · consultation en échec ({type(e).__name__})")
+    return texte, journal, session_id
 
 
 # Borne DURE de la carte de contexte, renvoi compris. L'injection intégrale de plan.md + mémoire
@@ -972,17 +1077,31 @@ def _compter_usage(role, modele, ev) -> None:
 
 
 def _lancer_agent(
-    role, consigne, worktree, reprendre=None, _relancer_rapport=True, modele=None
+    role,
+    consigne,
+    worktree,
+    reprendre=None,
+    _relancer_rapport=True,
+    modele=None,
+    service=False,
 ) -> dict:
     """Session codeur SCOPÉE : Read/Edit/Write only (pas de Bash), cwd=worktree, aucun MCP.
     `reprendre`=<session_id> : REPREND la session claude précédente (`--resume`) au lieu d'en
     rallumer une à froid — l'agent garde sa mémoire de travail (tours de correction) et le cache
     de prompt reste valide (même session/répertoire). Renvoie {ok, journal, texte, session_id}
-    (session_id à repasser en `reprendre` au tour suivant). Mockable en test."""
+    (session_id à repasser en `reprendre` au tour suivant). Mockable en test.
+
+    `service=True` : session de SERVICE (le conseil de `_porte_consultation`) — un rôle emprunté,
+    pas remplacé. Elle est dispensée des EFFETS DE BORD D'UNE MISSION : pas de relève ni
+    d'archivage du courrier du rôle (sa boîte reste intacte), pas de consignes d'exécutant, pas de
+    portes de sortie, pas de collecte de `courrier_sortant/` (qui appartient au demandeur et serait
+    republié signé du mauvais nom). Lecture seule. Elle n'est JAMAIS dispensée du NETTOYAGE de
+    l'espace partagé : le dossier des questions est vidé à la fin de toute session, celle-ci
+    comprise."""
     systeme = ROLES.get(role, ROLES["developpeur"]).replace("\x00", "")
-    outils = _OUTILS.get(role, _OUTILS["developpeur"])
+    outils = "Read,Glob,Grep" if service else _OUTILS.get(role, _OUTILS["developpeur"])
     courrier_releve, fil_releve = [], []
-    if reprendre:
+    if reprendre or service:
         # Session reprise : le contexte (plan + mémoire + code déjà lu au tour précédent) est DÉJÀ
         # dans la session. On n'envoie QUE le message (la correction), pas tout le préfixe réinjecté.
         # Le canal n'est PAS relevé ici : ce qui a été lu au premier tour est déjà dans la session.
@@ -1057,6 +1176,7 @@ def _lancer_agent(
             creationflags=CREATE_NO_WINDOW,
         )
     except Exception as e:
+        _relever_questions(worktree)  # invariant : dossier vide à la fin de TOUTE session
         return {
             "ok": False,
             "journal": [f"agent {role}: échec ({type(e).__name__})"],
@@ -1118,15 +1238,34 @@ def _lancer_agent(
         elif ev.get("type") == "result":
             texte = ev.get("result", texte)
             _compter_usage(role, modele or modele_pour(role), ev)
-    # PORTE DE SORTIE : le rapport passe le contrôle de format, ou l'agent est renvoyé le refaire.
-    # Seulement sur une mission menée à son terme (rc==0) et à froid : relancer le rapport d'une
-    # session déjà en échec n'apporterait rien.
-    if rc == 0 and reprendre is None:
+    # NETTOYAGE DE L'ESPACE PARTAGÉ, inconditionnel : TOUTE session (nominale, reprise, en échec,
+    # de service, relance d'une porte) vide le dossier des questions en le lisant. Hors de toute
+    # garde — les six tentatives précédentes ont chacune laissé un chemin de sortie qui ne
+    # drainait pas, et le contrôleur ramassait la question du développeur.
+    questions = _relever_questions(worktree)
+    # PORTES DE SORTIE, seulement sur une mission menée à son terme (rc==0) et à froid : une
+    # session reprise ou de service n'en a pas (c'est ce qui borne la consultation à UNE par
+    # mission : sa relance est une session reprise), et relancer une session déjà en échec
+    # n'apporterait rien.
+    if rc == 0 and reprendre is None and not service:
+        if questions and _relancer_rapport:
+            texte, journal, session_id = _porte_consultation(
+                role, questions, texte, worktree, session_id, journal, modele
+            )
         texte, journal = _porte_rapport(
             role, texte, worktree, session_id, journal, _relancer_rapport, modele
         )
+    elif questions:
+        journal.append(
+            f"{role} · {len(questions)} question(s) écartée(s) : pas de consultation sur cette session"
+        )
 
-    # D-15 : le courrier lu ne revient pas au tour suivant, ni le fil réellement affiché.
+    # D-15 : le courrier lu ne revient pas au tour suivant, ni le fil réellement affiché. Les
+    # sous-sessions internes (service, relance d'une porte) ne collectent pas : la session à froid
+    # qui les a lancées collecte à sa fin, et sous SON nom — sinon un message déposé une fois
+    # partirait deux fois, dont une signée du rôle emprunté.
+    if service or not _relancer_rapport:
+        return {"ok": rc == 0, "journal": journal, "texte": texte, "session_id": session_id}
     _archiver_canal(role, courrier_releve, fil_releve)
     envois = _collecter_canal(role, worktree)  # ...et ce que l'agent a écrit part vers les autres
     if envois["deposes"] or envois["fil"] or envois["rejetes"]:
