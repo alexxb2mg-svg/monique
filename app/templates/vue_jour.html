@@ -40,6 +40,13 @@
   <span class="chip gris">{{ brief.chantier.compte.rates }} rejetés / échecs</span>
 </div>
 
+{% for b in missions_bloquees() %}
+<details class="bloque">
+  <summary>Bloqué — {{ b.sujet }}</summary>
+  <pre>{{ b.raison or "Aucun verdict enregistré pour cette mission." }}</pre>
+</details>
+{% endfor %}
+
 <div class="poulsgrid">
   <div>
     <p class="sous">Sujets en cours</p>
