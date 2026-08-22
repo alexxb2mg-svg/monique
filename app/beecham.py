@@ -16,6 +16,7 @@ de nouveaux agents (nommés dans l'esprit de la brigade) — créés seulement a
 import json
 import logging
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -455,14 +456,16 @@ def lister_missions(chemin=None, limit=20) -> list[dict]:
         return []
 
 
-def demarrer_mission(consigne, chemin=None) -> str:
+def demarrer_mission(consigne, chemin=None, base=None) -> str:
+    """`base` : branche de départ du worktree (None = HEAD, cas courant). Renseignée par
+    `reprendre_mission` pour repartir du travail d'une mission bloquée au lieu de le refaire."""
     mid = "m" + uuid.uuid4().hex[:8]
     con = connexion_ecriture(chemin)
     try:
         con.execute(
-            "INSERT INTO secw_beecham_missions(id, consigne, statut, branche, journal, cree_le, maj_le) "
-            "VALUES(?,?,?,?,?,?,?)",
-            (mid, consigne, "en_cours", f"beecham/{mid}", "[]", _now(), _now()),
+            "INSERT INTO secw_beecham_missions(id, consigne, statut, branche, journal, base, cree_le, maj_le) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (mid, consigne, "en_cours", f"beecham/{mid}", "[]", base, _now(), _now()),
         )
         con.commit()
     finally:
@@ -470,13 +473,13 @@ def demarrer_mission(consigne, chemin=None) -> str:
     return mid
 
 
-def _creer_worktree(branche) -> Path:
+def _creer_worktree(branche, base="HEAD") -> Path:
     WORKTREES.mkdir(parents=True, exist_ok=True)
     wt = WORKTREES / branche.replace("/", "_")
     if wt.exists():
         _git(RACINE, "worktree", "remove", "--force", str(wt))
     _git(RACINE, "branch", "-D", branche)  # au cas où la branche traîne
-    r = _git(RACINE, "worktree", "add", "-b", branche, str(wt), "HEAD")
+    r = _git(RACINE, "worktree", "add", "-b", branche, str(wt), base)
     if r.returncode != 0:
         raise RuntimeError(f"worktree: {r.stderr.strip()[:200]}")
     return wt
@@ -995,8 +998,28 @@ def _lancer_agent(
     }
 
 
+BRANCHE_TRONC = "main"  # tronc dont on cherche le point de divergence (cf. _harnais)
+
+
 def _harnais(worktree) -> dict:
-    """Déterministe : lance les tests + le diff DANS le worktree. Jamais l'agent."""
+    """Déterministe : lance les tests + le diff DANS le worktree. Jamais l'agent.
+
+    Le diff est calculé contre le POINT DE DIVERGENCE d'avec le tronc (`git merge-base HEAD
+    main`), c'est-à-dire le commit d'où la branche de travail est partie. Deux raisons, et il
+    faut les deux :
+
+    - contre la POINTE de la branche (`git diff --cached` seul), une REPRISE ne montrerait que la
+      correction : la branche porte déjà les commits de la passe précédente, et le contrôleur
+      accepterait dix lignes greffées sur deux cents qu'il n'aurait jamais vues ;
+    - contre la POINTE de `main`, le diff serait pollué par tout ce qui a été fusionné DEPUIS le
+      départ de la mission — `main` est vivant (`_fusion_locale` y fusionne, et `serveur.py` comme
+      `harnais/boucle.py` lancent les missions dans des threads concurrents). Le travail des
+      autres missions apparaîtrait dans le diff, en SUPPRESSIONS qui plus est (absent de l'index
+      du worktree), et le contrôleur relirait un diff qui n'est pas celui de sa mission.
+
+    Le point de divergence est le seul repère fixe : il ne bouge pas quand `main` avance. Sur un
+    worktree neuf issu de HEAD il vaut HEAD, donc le diff est identique à celui d'avant ce
+    changement. Un seul chemin de code, pas de cas particulier."""
     py = subprocess.run(
         ["python", "-m", "pytest", "-q"],
         cwd=str(worktree / "app"),
@@ -1011,9 +1034,20 @@ def _harnais(worktree) -> dict:
     _git(
         worktree, "add", "-A"
     )  # inclure les fichiers NEUFs dans le diff (sinon invisibles)
-    diff = _git(worktree, "diff", "--cached").stdout
+    depart = _git(worktree, "merge-base", "HEAD", BRANCHE_TRONC).stdout.strip()
+    if not depart:
+        # pas de point de divergence (tronc absent, dépôt sans historique commun) : sans référence
+        # le diff sortirait VIDE, la mission serait déclarée « rien à fusionner » — donc sa branche
+        # supprimée et le travail perdu en silence. On casse bruyamment : worktree et branche
+        # restent sur le disque.
+        raise RuntimeError(
+            f"harnais : aucun point de divergence entre HEAD et {BRANCHE_TRONC!r}"
+        )
+    diff = _git(worktree, "diff", "--cached", depart).stdout
     fichiers = (
-        _git(worktree, "diff", "--cached", "--name-only").stdout.strip().splitlines()
+        _git(worktree, "diff", "--cached", "--name-only", depart)
+        .stdout.strip()
+        .splitlines()
     )
     return {
         "tests_ok": py.returncode == 0,
@@ -1078,8 +1112,12 @@ def _lancer_controleur(scope, diff, tests_resume, worktree, _agent=None) -> dict
     return {"verdict": verdict, "raison": texte}
 
 
-def _fusion_locale(branche, worktree, mission_id) -> bool:
-    """Commit + merge --no-ff LOCAL (jamais de push). Message générique — jamais la consigne."""
+def _commit_local(worktree, mission_id) -> None:
+    """Fige le travail sur la branche de la mission. Message générique — jamais la consigne.
+
+    Appelé AUSSI au blocage (pas seulement à la fusion) : sans commit, le travail d'une mission
+    bloquée n'existe que dans l'index de son worktree, et une branche de reprise créée depuis
+    cette branche repartirait de zéro. C'est ce commit qui rend `reprendre_mission` possible."""
     _git(worktree, "add", "-A")
     _git(
         worktree,
@@ -1091,6 +1129,11 @@ def _fusion_locale(branche, worktree, mission_id) -> bool:
         "-m",
         f"beecham: mission {mission_id}",
     )
+
+
+def _fusion_locale(branche, worktree, mission_id) -> bool:
+    """Commit + merge --no-ff LOCAL (jamais de push)."""
+    _commit_local(worktree, mission_id)
     r = _git(
         RACINE, "merge", "--no-ff", "-m", f"beecham: mission {mission_id}", branche
     )
@@ -1148,7 +1191,7 @@ def executer_mission(
     agent = _agent or _lancer_agent
     controle = _controleur or _lancer_controleur
     try:
-        wt = _creer_worktree(m["branche"])
+        wt = _creer_worktree(m["branche"], m.get("base") or "HEAD")
     except Exception as e:
         _maj(mission_id, chemin, statut="echec", journal=json.dumps([str(e)]))
         executions.finir(mission_id, "failed", str(e), None, chemin)
@@ -1170,7 +1213,23 @@ def executer_mission(
         )
         session_id = res.get("session_id") or session_id
         journal += res.get("journal", [])
-        h = _harnais(wt)
+        # `_harnais` peut lever (tronc absent -> aucun point de divergence). Sans ce filet
+        # l'exception s'échapperait : dans le thread de `serveur.py` elle mourrait en silence
+        # (mission `en_cours` pour toujours) et dans `harnais/boucle.py` elle sauterait le
+        # `_consommer_file` de la ligne suivante — la file rejouerait la vague, bug déjà corrigé
+        # une fois. Même patron que la création du worktree juste au-dessus : worktree et branche
+        # restent sur le disque, le travail n'est pas perdu.
+        try:
+            h = _harnais(wt)
+        except Exception as e:
+            _maj(
+                mission_id,
+                chemin,
+                statut="echec",
+                journal=json.dumps(journal + [str(e)], ensure_ascii=False),
+            )
+            executions.finir(mission_id, "failed", str(e), None, chemin)
+            return {"ok": False, "erreur": str(e)}
         journal.append(f"harnais · tests: {h['tests_resume'] or '?'}")
 
         if not h["diff"].strip():  # mission atelier : rien à fusionner
@@ -1192,6 +1251,8 @@ def executer_mission(
 
         if verdict == "accepte":
             ok = _fusion_locale(m["branche"], wt, mission_id)
+            if ok:
+                _clore_origine(m.get("base"), chemin)
             resume = "accepté + fusionné (local)" if ok else "conflit de fusion"
             executions.finir(
                 mission_id,
@@ -1229,6 +1290,9 @@ def executer_mission(
             )
             journal.append(f"→ correction demandée (tour {tour + 1})")
         else:
+            # le travail est FIGÉ sur la branche avant de bloquer : c'est ce qui permet à
+            # `reprendre_mission` d'en repartir au lieu de tout refaire depuis le tronc.
+            _commit_local(wt, mission_id)
             _maj(
                 mission_id,
                 chemin,
@@ -1260,6 +1324,61 @@ def executer_mission(
     }  # max_tours < 1 (garde-fou)
 
 
+def _dernier_verdict(mission_id) -> str:
+    """DERNIER bloc de `atelier/verdicts/<id>.md` — celui qui a bloqué la mission, pas les tours
+    précédents (le fichier est append-only, un bloc `## <date ISO> · <rôle> · <verdict>` par tour).
+
+    Découpe sur l'ANCRE de date, pas sur `## ` seul : la raison d'un verdict est du markdown de
+    contrôleur, truffé de titres. Un `rfind("\\n## ")` couperait dans le corps du dernier bloc et
+    perdrait sa TÊTE — c'est-à-dire le début de la consigne de correction, la valeur même que la
+    reprise existe pour récupérer.
+
+    Fail-soft : fichier absent ou illisible => chaîne vide, la reprise se fait sans."""
+    try:
+        txt = (ATELIER / "verdicts" / f"{mission_id}.md").read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    blocs = re.split(r"(?m)^## (?=\d{4})", txt)
+    return ("## " + blocs[-1]).strip() if len(blocs) > 1 else txt.strip()
+
+
+def _clore_origine(base, chemin=None) -> None:
+    """Une reprise fusionnée rend sa mission d'origine caduque : son travail est dans le tronc,
+    sa branche et son worktree n'ont plus de raison de traîner sur le disque, et son statut doit
+    dire qu'elle a été REPRISE plutôt que de rester `bloque` pour toujours (elle continuerait
+    sinon d'apparaître à Alex comme un blocage à traiter)."""
+    if not base or "/" not in base:
+        return
+    _nettoyer(base, WORKTREES / base.replace("/", "_"))
+    _maj(base.rsplit("/", 1)[-1], chemin, statut="repris")  # branche = beecham/<mission_id>
+
+
+def reprendre_mission(mission_id, complement="", chemin=None) -> str | None:
+    """Crée une mission NEUVE qui repart de la branche d'une mission `bloque`, avec le verdict qui
+    l'a bloquée en tête de consigne. Renvoie son id, ou None si la mission n'est pas reprenable.
+
+    Pourquoi : jusqu'ici une mission bloquée était un cul-de-sac — sa branche restait sur le
+    disque et la seule issue était une mission neuve qui refaisait TOUT depuis le tronc. Mesuré le
+    22/08 : quatre passes, 23,66 USD, rien de fusionné, alors que chaque verdict pointait une
+    correction de dix lignes. Ici on repart du travail existant et de la correction déjà écrite.
+
+    Appel EXPLICITE : rien ne reprend automatiquement."""
+    m = lire_mission(mission_id, chemin)
+    if not m or m.get("statut") != "bloque":
+        return None
+    verdict = _dernier_verdict(mission_id)
+    consigne = (
+        f"REPRISE de la mission {mission_id}. Son travail est DÉJÀ dans ta copie (commits de la "
+        "passe précédente) : corrige-le, ne repars pas de zéro.\n\n"
+    )
+    if verdict:
+        consigne += f"VERDICT QUI A BLOQUÉ LA MISSION :\n{verdict}\n\n"
+    if complement:
+        consigne += f"COMPLÉMENT :\n{complement}\n\n"
+    consigne += f"CONSIGNE D'ORIGINE :\n{m['consigne']}"
+    return demarrer_mission(consigne, chemin, base=m["branche"])
+
+
 def valider(mission_id, chemin=None) -> dict:
     """Validation MANUELLE (rare) : Alex fusionne une mission `bloque` (ou `propose` héritée).
     Le flux normal est automatique (executer_mission) — ceci n'est qu'un filet pour l'escalade."""
@@ -1268,6 +1387,11 @@ def valider(mission_id, chemin=None) -> dict:
         return {"ok": False, "erreur": "statut_invalide"}
     wt = WORKTREES / m["branche"].replace("/", "_")
     ok = _fusion_locale(m["branche"], wt, mission_id)
+    if ok:
+        # même clôture que la fusion automatique : sans elle l'origine resterait `bloque` avec sa
+        # branche sur le disque, réapparaîtrait sans fin dans `missions_bloquees()`, et une seconde
+        # reprise repartirait d'une branche DÉJÀ fusionnée (diff vide -> `livre` incompréhensible).
+        _clore_origine(m.get("base"), chemin)
     _maj(mission_id, chemin, statut="valide" if ok else "echec")
     return {"ok": ok, "erreur": None if ok else "conflit de fusion"}
 

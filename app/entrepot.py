@@ -64,7 +64,11 @@ CREATE TABLE IF NOT EXISTS secw_suggestions(
 CREATE TABLE IF NOT EXISTS secw_beecham_missions(
   id TEXT PRIMARY KEY, consigne TEXT, statut TEXT DEFAULT 'en_cours', branche TEXT,
   plan TEXT, agents_json TEXT, journal TEXT, diff TEXT, tests_json TEXT,
-  suggestions_agents TEXT, cree_le TEXT, maj_le TEXT);
+  suggestions_agents TEXT, cree_le TEXT, maj_le TEXT,
+  -- base : branche d'où part le worktree. NULL = HEAD (cas courant). Renseignée quand la
+  -- mission REPREND une mission bloquée (beecham.reprendre_mission) : son travail est déjà
+  -- commité sur cette branche, la reprise le corrige au lieu de le refaire.
+  base TEXT);
 """
 
 
@@ -124,7 +128,7 @@ def connexion_lecture(chemin: str | None = None) -> sqlite3.Connection:
     return con
 
 
-SCHEMA_CIBLE = 2  # revue migration C1 : incrémenter à chaque palier
+SCHEMA_CIBLE = 3  # revue migration C1 : incrémenter à chaque palier
 
 
 def _ajouter_colonne(con, table, col, decl):
@@ -152,6 +156,8 @@ def _migrer(con):
         _ajouter_colonne(con, "secw_delivery_obligations", "updated_at", "TEXT")
     if v < 2:  # garde-fou planificateur (revue M6, Phase 3)
         _ajouter_colonne(con, "secw_jobs", "cible_cmd", "TEXT")
+    if v < 3:  # reprise d'une mission bloquée (mission 9) : branche de départ du worktree
+        _ajouter_colonne(con, "secw_beecham_missions", "base", "TEXT")
     con.execute(f"PRAGMA user_version = {SCHEMA_CIBLE}")  # bump EN DERNIER
 
 

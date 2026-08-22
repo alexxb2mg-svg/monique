@@ -480,6 +480,7 @@ LIBELLES_STATUT = {
     "echec": "Échec",
     "livre": "Livré",
     "bloque": "Bloqué",
+    "repris": "Repris",  # mission bloquée dont une reprise a été fusionnée (beecham._clore_origine)
 }
 
 
